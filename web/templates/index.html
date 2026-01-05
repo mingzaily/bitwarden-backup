@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitwarden Backup Manager</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/tabs.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/modal.css">
+    <link rel="stylesheet" href="/static/css/table.css">
+    <link rel="stylesheet" href="/static/css/checkbox.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Bitwarden Backup Manager</h1>
+            <p>自动化备份和迁移管理系统</p>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="servers">源服务器</button>
+            <button class="tab-btn" data-tab="destinations">备份目标</button>
+            <button class="tab-btn" data-tab="tasks">备份任务</button>
+            <button class="tab-btn" data-tab="logs">执行日志</button>
+        </nav>
+
+        <!-- 服务器配置面板 -->
+        <div id="servers" class="tab-content active">
+            <div class="panel-header">
+                <h2>源服务器配置</h2>
+                <button class="btn btn-primary" onclick="showServerModal()">添加服务器</button>
+            </div>
+            <div id="servers-list"></div>
+        </div>
+
+        <!-- 备份目标面板 -->
+        <div id="destinations" class="tab-content">
+            <div class="panel-header">
+                <h2>备份目标配置</h2>
+                <button class="btn btn-primary" onclick="showDestinationModal()">添加目标</button>
+            </div>
+            <div id="destinations-list"></div>
+        </div>
+
+        <!-- 备份任务面板 -->
+        <div id="tasks" class="tab-content">
+            <div class="panel-header">
+                <h2>备份任务</h2>
+                <button class="btn btn-primary" onclick="showTaskModal()">创建任务</button>
+            </div>
+            <div id="tasks-list"></div>
+        </div>
+
+        <!-- 执行日志面板 -->
+        <div id="logs" class="tab-content">
+            <div class="panel-header">
+                <h2>执行日志</h2>
+                <button class="btn btn-secondary" onclick="loadLogs()">刷新</button>
+            </div>
+            <div id="logs-list"></div>
+        </div>
+    </div>
+
+    <!-- 服务器配置模态框 -->
+    <div id="serverModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeServerModal()">&times;</span>
+            <h2>服务器配置</h2>
+            <form id="serverForm" onsubmit="saveServer(event)">
+                <input type="hidden" id="serverId">
+                <div class="form-group">
+                    <label>名称</label>
+                    <input type="text" id="serverName" required>
+                </div>
+                <div class="form-group">
+                    <label>服务器 URL</label>
+                    <input type="text" id="serverURL" placeholder="https://vault.bitwarden.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Client ID</label>
+                    <input type="text" id="clientID" required>
+                </div>
+                <div class="form-group">
+                    <label>Client Secret</label>
+                    <input type="password" id="clientSecret" required>
+                </div>
+                <div class="form-group">
+                    <label>Master Password</label>
+                    <input type="password" id="masterPassword" required>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="isOfficial">
+                        官方服务器
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-primary">保存</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 任务配置模态框 -->
+    <div id="taskModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeTaskModal()">&times;</span>
+            <h2>备份任务配置</h2>
+            <form id="taskForm" onsubmit="saveTask(event)">
+                <input type="hidden" id="taskId">
+                <div class="form-group">
+                    <label>任务名称</label>
+                    <input type="text" id="taskName" required>
+                </div>
+                <div class="form-group">
+                    <label>源服务器</label>
+                    <select id="sourceServerId" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Cron 表达式</label>
+                    <input type="text" id="cronExpression" placeholder="0 0 2 * * *" required>
+                    <small>示例: 0 0 2 * * * (每天凌晨2点)</small>
+                </div>
+                <div class="form-group">
+                    <label>备份目标（可多选）</label>
+                    <div id="destinationCheckboxes" class="checkbox-group"></div>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="enabled" checked>
+                        启用任务
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-primary">保存</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 备份目标配置模态框 -->
+    <div id="destinationModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeDestinationModal()">&times;</span>
+            <h2>备份目标配置</h2>
+            <form id="destinationForm" onsubmit="saveDestination(event)">
+                <input type="hidden" id="destinationId">
+                <div class="form-group">
+                    <label>目标名称</label>
+                    <input type="text" id="destinationName" required>
+                </div>
+                <div class="form-group">
+                    <label>目标类型</label>
+                    <select id="destinationType" onchange="toggleDestinationType()" required>
+                        <option value="">请选择</option>
+                        <option value="local">本地存储</option>
+                        <option value="webdav">WebDAV</option>
+                        <option value="server">目标服务器</option>
+                    </select>
+                </div>
+                <!-- 本地存储配置 -->
+                <div id="localConfig" class="destination-config" style="display:none;">
+                    <div class="form-group">
+                        <label>本地路径</label>
+                        <input type="text" id="localPath" placeholder="/app/backups">
+                    </div>
+                </div>
+                <!-- WebDAV 配置 -->
+                <div id="webdavConfig" class="destination-config" style="display:none;">
+                    <div class="form-group">
+                        <label>WebDAV URL</label>
+                        <input type="text" id="webdavURL" placeholder="https://cloud.example.com/remote.php/dav/files/username/">
+                    </div>
+                    <div class="form-group">
+                        <label>用户名</label>
+                        <input type="text" id="webdavUsername">
+                    </div>
+                    <div class="form-group">
+                        <label>密码</label>
+                        <input type="password" id="webdavPassword">
+                    </div>
+                    <div class="form-group">
+                        <label>远程路径</label>
+                        <input type="text" id="webdavPath" placeholder="backups/">
+                    </div>
+                </div>
+                <!-- 目标服务器配置 -->
+                <div id="serverConfig" class="destination-config" style="display:none;">
+                    <div class="form-group">
+                        <label>目标服务器</label>
+                        <select id="targetServerId"></select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="destinationEnabled" checked>
+                        启用此目标
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-primary">保存</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/servers.js"></script>
+    <script src="/static/js/server-modal.js"></script>
+    <script src="/static/js/server-actions.js"></script>
+    <script src="/static/js/destinations.js"></script>
+    <script src="/static/js/destination-modal.js"></script>
+    <script src="/static/js/destination-actions.js"></script>
+    <script src="/static/js/destination-edit.js"></script>
+    <script src="/static/js/tasks.js"></script>
+    <script src="/static/js/task-modal.js"></script>
+    <script src="/static/js/task-actions.js"></script>
+    <script src="/static/js/logs.js"></script>
+</body>
+</html>

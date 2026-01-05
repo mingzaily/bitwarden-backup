@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(ccg:agents:get-current-datetime)",
+      "Skill(ccg:agents:init-architect)",
+      "Bash(ace-tool enhance-prompt:*)",
+      "Bash(tree:*)",
+      "Bash(go mod tidy:*)",
+      "Bash(go build:*)",
+      "Bash(curl:*)",
+      "Bash(pkill:*)",
+      "Bash(taskkill:*)",
+      "Bash(./bitwarden-backup.exe:*)"
+    ]
+  }
+}

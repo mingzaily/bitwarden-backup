@@ -1,0 +1,39 @@
+            <!-- WebDAV 配置 -->
+            <div id="webdavConfig" class="destination-config" style="display:none;">
+                <div class="form-group">
+                    <label>WebDAV URL</label>
+                    <input type="text" id="webdavURL" placeholder="https://cloud.example.com/remote.php/dav/files/username/">
+                </div>
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" id="webdavUsername">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="webdavPassword">
+                </div>
+                <div class="form-group">
+                    <label>远程路径</label>
+                    <input type="text" id="webdavPath" placeholder="backups/">
+                </div>
+            </div>
+
+            <!-- 目标服务器配置 -->
+            <div id="serverConfig" class="destination-config" style="display:none;">
+                <div class="form-group">
+                    <label>目标服务器</label>
+                    <select id="targetServerId"></select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="destinationEnabled" checked>
+                    启用此目标
+                </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary">保存</button>
+        </form>
+    </div>
+</div>
