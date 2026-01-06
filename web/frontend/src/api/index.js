@@ -14,7 +14,10 @@ const handleResponse = async (response) => {
 
 // Servers API
 export const serversApi = {
-  getAll: () => fetch(`${API_BASE}/servers`).then(handleResponse),
+  getAll: (params = {}) => {
+    const queryString = params.enabled !== undefined ? `?enabled=${params.enabled}` : ''
+    return fetch(`${API_BASE}/servers${queryString}`).then(handleResponse)
+  },
   getById: (id) => fetch(`${API_BASE}/servers/${id}`).then(handleResponse),
   create: (data) => fetch(`${API_BASE}/servers`, {
     method: 'POST',

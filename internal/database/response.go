@@ -9,6 +9,7 @@ type ServerConfigResponse struct {
 	ClientSecret   string `json:"client_secret"`
 	MasterPassword string `json:"master_password"`
 	IsOfficial     bool   `json:"is_official"`
+	Enabled        bool   `json:"enabled"`
 	CreatedAt      string `json:"created_at"`
 	UpdatedAt      string `json:"updated_at"`
 }
@@ -23,6 +24,7 @@ func (s *ServerConfig) ToResponse() ServerConfigResponse {
 		ClientSecret:   maskSensitive(s.ClientSecret),
 		MasterPassword: maskSensitive(s.MasterPassword),
 		IsOfficial:     s.IsOfficial,
+		Enabled:        s.Enabled,
 		CreatedAt:      s.CreatedAt.Format("2006-01-02 15:04:05"),
 		UpdatedAt:      s.UpdatedAt.Format("2006-01-02 15:04:05"),
 	}

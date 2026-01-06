@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mingzaily/bitwarden-backup/internal/database"
@@ -10,7 +11,18 @@ import (
 // GetServers 获取所有服务器配置
 func GetServers(c *gin.Context) {
 	var servers []database.ServerConfig
-	if err := database.DB.Find(&servers).Error; err != nil {
+	query := database.DB
+
+	if enabledParam := c.Query("enabled"); enabledParam != "" {
+		enabled, err := strconv.ParseBool(enabledParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid enabled parameter"})
+			return
+		}
+		query = query.Where("enabled = ?", enabled)
+	}
+
+	if err := query.Find(&servers).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

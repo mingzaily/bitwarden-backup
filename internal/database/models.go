@@ -16,6 +16,7 @@ type ServerConfig struct {
 	ClientSecret   string    `gorm:"size:500" json:"client_secret"`   // 增加长度以容纳加密数据
 	MasterPassword string    `gorm:"size:500" json:"master_password"` // 增加长度以容纳加密数据
 	IsOfficial     bool      `gorm:"default:false" json:"is_official"`
+	Enabled        bool      `gorm:"default:true" json:"enabled"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
