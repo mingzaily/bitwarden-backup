@@ -35,6 +35,11 @@ func (s *Scheduler) performBackupToDestinations(task database.BackupTask, backup
 
 	// 创建 Bitwarden 客户端并导出数据
 	client := bitwarden.NewClient()
+	
+	// 确保之前的会话已清除，防止 "Logout required before server config update" 错误
+	// 忽略登出错误（可能并未登录）
+	_ = client.Logout()
+
 	if err := client.ConfigServer(sourceServer.ServerURL); err != nil {
 		return fmt.Errorf("failed to config server: %w", err)
 	}
