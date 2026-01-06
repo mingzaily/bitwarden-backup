@@ -45,17 +45,75 @@ go build -o bitwarden-backup ./cmd/server
 | `SERVER_PORT`                  | 服务端口               | 8080                       | 否   |
 | `DB_PATH`                      | 数据库路径             | ./data/bitwarden-backup.db | 否   |
 | `LOG_LEVEL`                    | 日志级别               | info                       | 否   |
-| `BITWARDEN_BACKUP_MASTER_KEY`  | 加密主密钥（强烈推荐） | 自动生成（仅开发环境）     | 推荐 |
+| `BITWARDEN_BACKUP_MASTER_KEY`  | 加密主密钥             | 自动生成并保存到 .env      | 自动 |
 
-**🔒 安全提示**：强烈建议设置 `BITWARDEN_BACKUP_MASTER_KEY` 以保护数据库中的敏感凭证。
+### 🔒 加密密钥管理
 
-生成安全的主密钥：
-```bash
-openssl rand -base64 32
+**重要说明**：系统会自动管理加密密钥，确保数据安全和持久性。
+
+#### 密钥加载优先级
+
+1. **环境变量** `BITWARDEN_BACKUP_MASTER_KEY`（推荐用于生产环境）
+2. **`.env` 文件**（自动生成，用于开发环境）
+3. **自动生成**（首次启动时）
+
+#### 首次启动
+
+首次启动时，如果未设置环境变量，系统会：
+- 自动生成一个安全的随机密钥（32字节，Base64编码）
+- 保存到项目根目录的 `.env` 文件
+- 设置文件权限为 `0600`（仅所有者可读写）
+- 在日志中提示备份 `.env` 文件
+
+```
+[Encryption] No master key found, generating new key...
+[Encryption] New master key generated and saved to .env
+[Encryption] ⚠️  IMPORTANT: Backup this .env file! Losing it means permanent data loss.
 ```
 
-设置环境变量：
+#### ⚠️ 重要：备份 .env 文件
+
+**`.env` 文件包含加密密钥，丢失后将无法解密数据库中的敏感信息！**
+
 ```bash
+# 备份 .env 文件到安全位置
+cp .env .env.backup
+
+# 或者使用环境变量（推荐生产环境）
+export BITWARDEN_BACKUP_MASTER_KEY="your-key-from-env-file"
+```
+
+#### 生产环境部署
+
+**推荐使用环境变量而非 .env 文件：**
+
+```bash
+# 方式 1: 直接设置环境变量
+export BITWARDEN_BACKUP_MASTER_KEY="your-generated-key-here"
+
+# 方式 2: 从 .env 文件读取并设置
+export BITWARDEN_BACKUP_MASTER_KEY=$(grep BITWARDEN_BACKUP_MASTER_KEY .env | cut -d '=' -f2 | tr -d '"')
+```
+
+**Docker Compose 部署：**
+
+```yaml
+# docker-compose.yml
+services:
+  bitwarden-backup:
+    environment:
+      - BITWARDEN_BACKUP_MASTER_KEY=${BITWARDEN_BACKUP_MASTER_KEY}
+```
+
+#### 手动生成密钥（可选）
+
+如果需要手动生成密钥：
+
+```bash
+# 生成密钥
+openssl rand -base64 32
+
+# 设置环境变量
 export BITWARDEN_BACKUP_MASTER_KEY="your-generated-key-here"
 ```
 

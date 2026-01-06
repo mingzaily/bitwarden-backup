@@ -1,0 +1,294 @@
+{
+  "project_name": "Bitwarden Backup Manager",
+  "last_scan_timestamp": "2026-01-07T01:54:20Z",
+  "scan_version": "1.0.0",
+  "root_documentation": "CLAUDE.md",
+  "modules": [
+    {
+      "path": "cmd/server",
+      "name": "HTTP Server",
+      "language": "Go",
+      "entry_points": ["main.go", "router.go"],
+      "documentation": "cmd/server/CLAUDE.md",
+      "key_files": [
+        "cmd/server/main.go",
+        "cmd/server/router.go"
+      ],
+      "coverage": {
+        "scanned": true,
+        "entry_documented": true,
+        "api_documented": true,
+        "tests_found": false
+      }
+    },
+    {
+      "path": "cmd/tools",
+      "name": "Tools",
+      "language": "Go",
+      "entry_points": ["test-task/main.go"],
+      "documentation": null,
+      "key_files": [
+        "cmd/tools/test-task/main.go"
+      ],
+      "coverage": {
+        "scanned": true,
+        "entry_documented": false,
+        "api_documented": false,
+        "tests_found": false
+      }
+    },
+    {
+      "path": "internal/bitwarden",
+      "name": "Bitwarden CLI Client",
+      "language": "Go",
+      "entry_points": ["client.go"],
+      "documentation": "internal/bitwarden/CLAUDE.md",
+      "key_files": [
+        "internal/bitwarden/client.go",
+        "internal/bitwarden/export.go",
+        "internal/bitwarden/import.go"
+      ],
+      "coverage": {
+        "scanned": true,
+        "entry_documented": true,
+        "api_documented": true,
+        "tests_found": false
+      }
+    },
+    {
+      "path": "internal/config",
+      "name": "Configuration Management",
+      "language": "Go",
+      "entry_points": ["config.go"],
+      "documentation": "internal/config/CLAUDE.md",
+      "key_files": [
+        "internal/config/config.go"
+      ],
+      "coverage": {
+        "scanned": true,
+        "entry_documented": true,
+        "api_documented": true,
+        "tests_found": false
+      }
+    },
+    {
+      "path": "internal/crypto",
+      "name": "Encryption Service",
+      "language": "Go",
+      "entry_points": ["crypto.go"],
+      "documentation": "internal/crypto/CLAUDE.md",
+      "key_files": [
+        "internal/crypto/crypto.go"
+      ],
+      "coverage": {
+        "scanned": true,
+        "entry_documented": true,
+        "api_documented": true,
+        "tests_found": false
+      }
+    },
+    {
+      "path": "internal/database",
+      "name": "Database Layer",
+      "language": "Go",
+      "entry_points": ["db.go"],
+      "documentation": "internal/database/CLAUDE.md",
+      "key_files": [
+        "internal/database/db.go",
+        "internal/database/models.go",
+        "internal/database/migrate.go",
+        "internal/database/response.go"
+      ],
+      "coverage": {
+        "scanned": true,
+        "entry_documented": true,
+        "api_documented": true,
+        "data_models_documented": true,
+        "tests_found": false
+      }
+    },
+    {
+      "path": "internal/handler",
+      "name": "HTTP Handlers",
+      "language": "Go",
+      "entry_points": ["server.go", "destination.go", "task.go", "log.go"],
+      "documentation": "internal/handler/CLAUDE.md",
+      "key_files": [
+        "internal/handler/server.go",
+        "internal/handler/server_crud.go",
+        "internal/handler/destination.go",
+        "internal/handler/destination_crud.go",
+        "internal/handler/task.go",
+        "internal/handler/task_crud.go",
+        "internal/handler/task_execute.go",
+        "internal/handler/log.go"
+      ],
+      "coverage": {
+        "scanned": true,
+        "entry_documented": true,
+        "api_documented": true,
+        "tests_found": false
+      }
+    },
+    {
+      "path": "internal/scheduler",
+      "name": "Task Scheduler",
+      "language": "Go",
+      "entry_points": ["scheduler.go"],
+      "documentation": "internal/scheduler/CLAUDE.md",
+      "key_files": [
+        "internal/scheduler/scheduler.go",
+        "internal/scheduler/task.go",
+        "internal/scheduler/execute.go",
+        "internal/scheduler/execute_now.go",
+        "internal/scheduler/backup.go",
+        "internal/scheduler/backup_local.go",
+        "internal/scheduler/backup_webdav.go",
+        "internal/scheduler/backup_server.go",
+        "internal/scheduler/destination_handler.go",
+        "internal/scheduler/migrate.go",
+        "internal/scheduler/multi_destination.go"
+      ],
+      "coverage": {
+        "scanned": true,
+        "entry_documented": true,
+        "api_documented": true,
+        "tests_found": false
+      }
+    },
+    {
+      "path": "internal/webdav",
+      "name": "WebDAV Client",
+      "language": "Go",
+      "entry_points": ["client.go"],
+      "documentation": "internal/webdav/CLAUDE.md",
+      "key_files": [
+        "internal/webdav/client.go",
+        "internal/webdav/upload.go"
+      ],
+      "coverage": {
+        "scanned": true,
+        "entry_documented": true,
+        "api_documented": true,
+        "tests_found": false
+      }
+    },
+    {
+      "path": "web/frontend",
+      "name": "Vue 3 Frontend",
+      "language": "JavaScript/Vue",
+      "entry_points": ["src/main.js"],
+      "documentation": "web/frontend/CLAUDE.md",
+      "key_files": [
+        "web/frontend/src/main.js",
+        "web/frontend/src/App.vue",
+        "web/frontend/src/router/index.js",
+        "web/frontend/src/api/index.js",
+        "web/frontend/package.json",
+        "web/frontend/vite.config.js"
+      ],
+      "coverage": {
+        "scanned": true,
+        "entry_documented": true,
+        "api_documented": true,
+        "components_documented": true,
+        "tests_found": false
+      }
+    }
+  ],
+  "statistics": {
+    "total_modules": 10,
+    "documented_modules": 9,
+    "total_go_files": 32,
+    "total_vue_files": 13,
+    "total_js_files": 4,
+    "test_files_found": 0,
+    "coverage_percentage": 90
+  },
+  "gaps": [
+    {
+      "module": "cmd/tools",
+      "issue": "No module documentation",
+      "priority": "low",
+      "recommendation": "Create cmd/tools/CLAUDE.md if tools become more complex"
+    },
+    {
+      "module": "all",
+      "issue": "No unit tests found",
+      "priority": "high",
+      "recommendation": "Add test files: *_test.go for Go modules, *.spec.js for Vue components"
+    },
+    {
+      "module": "internal/scheduler",
+      "issue": "No retry mechanism for failed backups",
+      "priority": "medium",
+      "recommendation": "Implement automatic retry with exponential backoff"
+    },
+    {
+      "module": "internal/scheduler",
+      "issue": "No backup retention policy",
+      "priority": "medium",
+      "recommendation": "Add automatic cleanup of old backup files"
+    },
+    {
+      "module": "web/frontend",
+      "issue": "No form validation",
+      "priority": "medium",
+      "recommendation": "Add Vuelidate or Yup for form validation"
+    }
+  ],
+  "ignore_patterns": [
+    "node_modules/**",
+    ".git/**",
+    ".github/**",
+    "dist/**",
+    "build/**",
+    ".next/**",
+    "__pycache__/**",
+    "*.lock",
+    "*.log",
+    "*.bin",
+    "*.pdf",
+    "*.png",
+    "*.jpg",
+    "*.jpeg",
+    "*.gif",
+    "*.mp4",
+    "*.zip",
+    "*.tar",
+    "*.gz",
+    "data/**",
+    "backups/**",
+    "*.db",
+    "*.db-shm",
+    "*.db-wal",
+    ".idea/**",
+    ".vscode/**",
+    "*.swp",
+    "*.swo",
+    ".DS_Store",
+    "Thumbs.db",
+    ".env",
+    ".env.local",
+    ".ace-tool/**",
+    "web/frontend/node_modules/**",
+    "web/frontend/dist/**",
+    "web/dist/**",
+    "*.local",
+    "vendor/**"
+  ],
+  "next_steps": [
+    "Add unit tests for internal/crypto module (encryption/decryption)",
+    "Add unit tests for internal/database module (GORM hooks)",
+    "Add unit tests for internal/scheduler module (task scheduling logic)",
+    "Add Vitest configuration for frontend testing",
+    "Add API integration tests for handlers",
+    "Implement backup retry mechanism",
+    "Implement backup retention policy",
+    "Add form validation to frontend",
+    "Add health check endpoint (/health)",
+    "Add API authentication/authorization (JWT)"
+  ],
+  "truncated": false,
+  "scan_notes": "Full project scan completed successfully. All major modules documented. No test files found - testing infrastructure needs to be established."
+}
