@@ -7,9 +7,12 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
+	"log"
 	"os"
 
+	"github.com/joho/godotenv"
 	"golang.org/x/crypto/pbkdf2"
 )
 
@@ -25,29 +28,140 @@ var encryptionKey []byte
 
 // InitEncryption 初始化加密系统
 func InitEncryption() error {
-	// 从环境变量获取主密钥
+	// 1. 首先检查环境变量
 	masterKey := os.Getenv("BITWARDEN_BACKUP_MASTER_KEY")
-	if masterKey == "" {
-		// 如果未设置，生成一个随机密钥（仅用于开发环境）
-		masterKey = generateRandomKey()
-		// 在生产环境中，应该要求用户设置此环境变量
-		// return ErrEncryptionKeyNotSet
+	if masterKey != "" {
+		log.Println("[Encryption] Master key loaded from environment variable")
+		return deriveEncryptionKey(masterKey)
 	}
 
-	// 使用 PBKDF2 派生加密密钥
-	salt := []byte("bitwarden-backup-salt-v1") // 在生产环境中应该使用随机盐并存储
-	encryptionKey = pbkdf2.Key([]byte(masterKey), salt, 100000, 32, sha256.New)
+	// 2. 尝试从 .env 文件加载
+	envPath := ".env"
+	masterKey, err := loadKeyFromEnvFile(envPath)
+	if err == nil && masterKey != "" {
+		log.Printf("[Encryption] Master key loaded from %s file", envPath)
+		return deriveEncryptionKey(masterKey)
+	}
 
+	// 如果是文件不存在以外的错误，返回错误（避免覆盖损坏的文件）
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to load key from .env file: %w", err)
+	}
+
+	// 3. 生成新密钥并保存到 .env 文件（仅当文件不存在时）
+	log.Println("[Encryption] No master key found, generating new key...")
+	masterKey, err = generateAndSaveKey(envPath)
+	if err != nil {
+		return fmt.Errorf("failed to generate and save master key: %w", err)
+	}
+
+	log.Printf("[Encryption] New master key generated and saved to %s", envPath)
+	log.Println("[Encryption] ⚠️  IMPORTANT: Backup this .env file! Losing it means permanent data loss.")
+
+	return deriveEncryptionKey(masterKey)
+}
+
+// deriveEncryptionKey 从主密钥派生加密密钥
+func deriveEncryptionKey(masterKey string) error {
+	// 使用 PBKDF2 派生加密密钥
+	salt := []byte("bitwarden-backup-salt-v1")
+	encryptionKey = pbkdf2.Key([]byte(masterKey), salt, 100000, 32, sha256.New)
 	return nil
 }
 
-// generateRandomKey 生成随机密钥（仅用于开发）
+// loadKeyFromEnvFile 从 .env 文件加载密钥
+func loadKeyFromEnvFile(envPath string) (string, error) {
+	// 检查文件是否存在
+	if _, err := os.Stat(envPath); os.IsNotExist(err) {
+		return "", err
+	}
+
+	// 加载 .env 文件
+	envMap, err := godotenv.Read(envPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read .env file: %w", err)
+	}
+
+	// 获取密钥
+	masterKey, exists := envMap["BITWARDEN_BACKUP_MASTER_KEY"]
+	if !exists || masterKey == "" {
+		return "", errors.New("BITWARDEN_BACKUP_MASTER_KEY not found in .env")
+	}
+
+	return masterKey, nil
+}
+
+// generateRandomKey 生成随机密钥
 func generateRandomKey() string {
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
-		panic(err)
+		panic(fmt.Sprintf("failed to generate random key: %v", err))
 	}
 	return base64.StdEncoding.EncodeToString(key)
+}
+
+// generateAndSaveKey 生成新密钥并保存到 .env 文件
+func generateAndSaveKey(envPath string) (string, error) {
+	// 生成新密钥
+	masterKey := generateRandomKey()
+
+	// 准备 .env 内容
+	envMap := make(map[string]string)
+
+	// 如果文件已存在，先读取现有内容（保护其他配置项）
+	if _, err := os.Stat(envPath); err == nil {
+		existingEnv, err := godotenv.Read(envPath)
+		if err != nil {
+			// 如果无法读取现有文件，返回错误而不是覆盖
+			return "", fmt.Errorf("existing .env file is corrupted or unreadable: %w", err)
+		}
+		envMap = existingEnv
+	}
+
+	// 设置新密钥
+	envMap["BITWARDEN_BACKUP_MASTER_KEY"] = masterKey
+
+	// 使用安全的方式写入 .env 文件（创建时就设置 0600 权限）
+	if err := writeEnvFileSecurely(envPath, envMap); err != nil {
+		return "", fmt.Errorf("failed to write .env file: %w", err)
+	}
+
+	return masterKey, nil
+}
+
+// writeEnvFileSecurely 以安全的方式写入 .env 文件（创建时就设置 0600 权限）
+func writeEnvFileSecurely(envPath string, envMap map[string]string) error {
+	// 创建临时文件，直接设置 0600 权限
+	tmpFile, err := os.OpenFile(envPath+".tmp", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer tmpFile.Close()
+
+	// 写入内容
+	for key, value := range envMap {
+		if _, err := fmt.Fprintf(tmpFile, "%s=\"%s\"\n", key, value); err != nil {
+			os.Remove(envPath + ".tmp")
+			return fmt.Errorf("failed to write to temp file: %w", err)
+		}
+	}
+
+	// 确保数据写入磁盘
+	if err := tmpFile.Sync(); err != nil {
+		os.Remove(envPath + ".tmp")
+		return fmt.Errorf("failed to sync temp file: %w", err)
+	}
+
+	// 关闭临时文件
+	tmpFile.Close()
+
+	// 原子性地重命名临时文件为目标文件
+	if err := os.Rename(envPath+".tmp", envPath); err != nil {
+		os.Remove(envPath + ".tmp")
+		return fmt.Errorf("failed to rename temp file: %w", err)
+	}
+
+	return nil
 }
 
 // Encrypt 加密数据
