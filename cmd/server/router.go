@@ -1,6 +1,10 @@
 package main
 
 import (
+	"net/http"
+	"path/filepath"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/mingzaily/bitwarden-backup/internal/handler"
 )
@@ -8,14 +12,8 @@ import (
 func setupRouter() *gin.Engine {
 	r := gin.Default()
 
-	// 静态文件
-	r.Static("/static", "./web/static")
-	r.LoadHTMLGlob("./web/templates/*")
-
-	// 首页
-	r.GET("/", func(c *gin.Context) {
-		c.HTML(200, "index.html", nil)
-	})
+	// 静态资源（Vue 构建产物）
+	r.Static("/assets", "./web/dist/assets")
 
 	// API 路由
 	api := r.Group("/api")
@@ -33,6 +31,7 @@ func setupRouter() *gin.Engine {
 		api.POST("/destinations", handler.CreateDestination)
 		api.PUT("/destinations/:id", handler.UpdateDestination)
 		api.DELETE("/destinations/:id", handler.DeleteDestination)
+		api.PATCH("/destinations/:id/toggle", handler.ToggleDestination)
 
 		// 备份任务
 		api.GET("/tasks", handler.GetTasks)
@@ -45,6 +44,27 @@ func setupRouter() *gin.Engine {
 		// 日志
 		api.GET("/logs", handler.GetLogs)
 	}
+
+	// SPA History Mode Fallback
+	// 对于非 API 和非静态资源的请求，返回 index.html
+	r.NoRoute(func(c *gin.Context) {
+		path := c.Request.URL.Path
+
+		// 如果是 API 请求，返回 404
+		if strings.HasPrefix(path, "/api/") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+			return
+		}
+
+		// 如果是静态资源请求（有文件扩展名），返回 404
+		if filepath.Ext(path) != "" {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		// 其他请求返回 Vue SPA 的 index.html
+		c.File("./web/dist/index.html")
+	})
 
 	return r
 }

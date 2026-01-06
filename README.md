@@ -1,54 +1,107 @@
 # Bitwarden Backup
 
-自动化 Bitwarden 密码库备份和迁移工具
+自动化 Bitwarden 密码库备份和迁移工具，支持多目标备份（本地、WebDAV、目标服务器）。
 
 ## 功能特性
 
-- ✅ 定时自动备份（支持 Cron 表达式）
-- ✅ 自动迁移到官方服务器（可选）
-- ✅ Web 管理界面
-- ✅ 支持多服务器配置
-- ✅ 备份历史和日志查看
-- ✅ Docker 容器化部署
+- 定时自动备份（支持 Cron 表达式）
+- 多备份目标支持：本地存储、WebDAV、目标服务器
+- Web 管理界面
+- 支持多源服务器配置
+- 备份历史和日志查看
+- 远程备份后自动清理临时文件
+- **🔒 AES-256-GCM 加密保护敏感凭证**
 
-## 技术栈
+## 前置要求
 
-- **后端**: Go 1.21 + Gin
-- **数据库**: SQLite
-- **调度器**: robfig/cron
-- **前端**: 原生 HTML/CSS/JavaScript
-- **部署**: Docker + Docker Compose
+- [Bitwarden CLI](https://bitwarden.com/help/cli/) 已安装并配置
+- Go 1.21+（本地运行）或 Docker（容器运行）
 
 ## 快速开始
 
-### 使用 Docker Compose（推荐）
+### 方式一：Docker Compose（推荐）
 
 ```bash
-# 克隆项目
-git clone <repository-url>
+git clone https://github.com/mingzaily/bitwarden-backup.git
 cd bitwarden-backup
-
-# 启动服务
-docker-compose up -d
-
-# 访问 Web 界面
-open http://localhost:8080
+docker compose up -d
 ```
 
-### 本地开发
+### 方式二：本地编译运行
 
 ```bash
-# 安装依赖
-go mod download
-
-# 运行服务
-go run cmd/server/main.go
+git clone <repository-url>
+cd bitwarden-backup
+go build -o bitwarden-backup ./cmd/server
+./bitwarden-backup
 ```
 
 ## 配置说明
 
 ### 环境变量
 
-- `SERVER_PORT`: 服务端口（默认: 8080）
-- `DB_PATH`: 数据库路径（默认: ./data/bitwarden-backup.db）
-- `LOG_LEVEL`: 日志级别（默认: info）
+| 变量                           | 说明                   | 默认值                     | 必需 |
+| ------------------------------ | ---------------------- | -------------------------- | ---- |
+| `SERVER_PORT`                  | 服务端口               | 8080                       | 否   |
+| `DB_PATH`                      | 数据库路径             | ./data/bitwarden-backup.db | 否   |
+| `LOG_LEVEL`                    | 日志级别               | info                       | 否   |
+| `BITWARDEN_BACKUP_MASTER_KEY`  | 加密主密钥（强烈推荐） | 自动生成（仅开发环境）     | 推荐 |
+
+**🔒 安全提示**：强烈建议设置 `BITWARDEN_BACKUP_MASTER_KEY` 以保护数据库中的敏感凭证。
+
+生成安全的主密钥：
+```bash
+openssl rand -base64 32
+```
+
+设置环境变量：
+```bash
+export BITWARDEN_BACKUP_MASTER_KEY="your-generated-key-here"
+```
+
+## 使用指南
+
+### 1. 配置源服务器
+
+在"源服务器"页面添加 Bitwarden 服务器配置：
+
+- **名称**: 服务器标识名称
+- **服务器 URL**: Bitwarden 服务器地址（如 `https://vault.bitwarden.com`）
+- **Client ID / Client Secret**: API 密钥（在 Bitwarden 设置中获取）
+- **Master Password**: 主密码（用于解锁密码库导出数据）
+
+> **注意**: 即使使用 API Key 登录，Bitwarden CLI 仍需要主密码来解锁密码库并导出数据。
+
+> **🔒 安全**: 所有敏感凭证（Client ID、Client Secret、Master Password）都使用 AES-256-GCM 加密存储。详见 [SECURITY.md](SECURITY.md)
+
+### 2. 配置备份目标
+
+支持三种备份目标类型：
+
+- **本地存储**: 备份到本地目录
+- **WebDAV**: 备份到 WebDAV 服务器（如 Nextcloud）
+- **目标服务器**: 导入到另一个 Bitwarden 服务器
+
+### 3. 创建备份任务
+
+配置定时备份任务，支持 Cron 表达式：
+
+```
+秒 分 时 日 月 周
+0  0  2  *  *  *   # 每天凌晨 2 点
+0  0  */6 *  *  *  # 每 6 小时
+0  30 1  *  *  1   # 每周一凌晨 1:30
+```
+
+## 目录结构
+
+```
+bitwarden-backup/
+├── data/           # 数据库文件
+├── backups/        # 本地备份文件
+└── .tmp/           # 临时文件（自动清理）
+```
+
+## License
+
+MIT
