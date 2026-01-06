@@ -1,6 +1,7 @@
 <template>
-  <div class="modal show" @click.self="$emit('close')">
-    <div class="modal-content bg-white rounded-lg border-2 border-black shadow-brutalist max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+  <Teleport to="body">
+    <div class="modal show" @click.self="$emit('close')">
+      <div class="modal-content bg-white rounded-lg border-2 border-black shadow-brutalist max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
       <!-- Modal Header -->
       <div class="px-6 py-4 border-b-2 border-black bg-brutalist-cream/20">
         <div class="flex items-center justify-between">
@@ -34,25 +35,139 @@
           label="存储类型"
         />
 
-        <div>
-          <label class="block text-sm font-bold text-gray-900 mb-2">存储路径</label>
-          <input
-            v-model="formData.path"
-            type="text"
-            required
-            class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
-            placeholder="/path/to/backup"
-          />
+        <!-- Local Config -->
+        <div v-if="formData.type === 'local'" class="space-y-4">
+          <div>
+            <label class="block text-sm font-bold text-gray-900 mb-2">本地路径</label>
+            <input
+              v-model="formData.local_path"
+              type="text"
+              required
+              class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
+              placeholder="/data/backups"
+            />
+            <p class="mt-1 text-xs text-gray-600">
+              💡 请填写绝对路径，例如：<code class="px-1 py-0.5 bg-gray-100 rounded">/app/backups</code> 或 <code class="px-1 py-0.5 bg-gray-100 rounded">D:/backups</code>
+            </p>
+          </div>
         </div>
 
-        <div v-if="formData.type !== 'local'">
-          <label class="block text-sm font-bold text-gray-900 mb-2">配置信息 (JSON)</label>
-          <textarea
-            v-model="formData.config"
-            rows="4"
-            class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue font-mono text-sm"
-            placeholder='{"accessKeyId": "xxx", "secretAccessKey": "xxx"}'
-          ></textarea>
+        <!-- WebDAV Config -->
+        <div v-if="formData.type === 'webdav'" class="space-y-4">
+          <div>
+            <label class="block text-sm font-bold text-gray-900 mb-2">WebDAV URL</label>
+            <input
+              v-model="formData.webdav_url"
+              type="text"
+              required
+              class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
+              placeholder="https://dav.example.com"
+            />
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-bold text-gray-900 mb-2">用户名</label>
+              <input
+                v-model="formData.webdav_username"
+                type="text"
+                class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-gray-900 mb-2">密码</label>
+              <input
+                v-model="formData.webdav_password"
+                type="password"
+                class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
+              />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-900 mb-2">存储路径</label>
+            <input
+              v-model="formData.webdav_path"
+              type="text"
+              class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
+              placeholder="/backups"
+            />
+          </div>
+        </div>
+
+        <!-- S3 Config -->
+        <div v-if="formData.type === 's3'" class="space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-bold text-gray-900 mb-2">Endpoint</label>
+              <input
+                v-model="formData.s3_endpoint"
+                type="text"
+                required
+                class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
+                placeholder="s3.amazonaws.com"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-gray-900 mb-2">区域 (Region)</label>
+              <input
+                v-model="formData.s3_region"
+                type="text"
+                required
+                class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
+                placeholder="us-east-1"
+              />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-900 mb-2">Bucket 名称</label>
+            <input
+              v-model="formData.s3_bucket"
+              type="text"
+              required
+              class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
+            />
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-bold text-gray-900 mb-2">Access Key</label>
+              <input
+                v-model="formData.s3_access_key"
+                type="text"
+                class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-gray-900 mb-2">Secret Key</label>
+              <input
+                v-model="formData.s3_secret_key"
+                type="password"
+                class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
+              />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-900 mb-2">存储路径</label>
+            <input
+              v-model="formData.s3_path"
+              type="text"
+              class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
+              placeholder="/backups"
+            />
+          </div>
+        </div>
+
+        <!-- Server Config -->
+        <div v-if="formData.type === 'server'" class="space-y-4">
+          <CustomSelect
+            v-model="formData.target_server_id"
+            :options="servers.map(s => ({
+              label: s.name,
+              value: s.id,
+              description: s.server_url
+            }))"
+            label="目标服务器"
+            placeholder="请选择目标服务器"
+            empty-text="⚠️ 暂无可用服务器，请先创建服务器"
+          />
         </div>
 
         <!-- 加密选项（仅本地和 WebDAV 和 S3 显示） -->
@@ -89,14 +204,16 @@
       </form>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
-import { destinationsApi } from '@/api'
+import { ref, watch, onMounted } from 'vue'
+import { destinationsApi, serversApi } from '@/api'
 import { useToast } from '@/composables/useToast'
 import TabSelector from './TabSelector.vue'
 import ToggleButton from './ToggleButton.vue'
+import CustomSelect from './CustomSelect.vue'
 
 const props = defineProps({
   destination: Object
@@ -112,11 +229,23 @@ const storageTypes = [
   { label: '官方服务器', value: 'server' }
 ]
 
+const servers = ref([])
+
 const formData = ref({
   name: '',
   type: 'local',
-  path: '',
-  config: '',
+  local_path: '',
+  webdav_url: '',
+  webdav_username: '',
+  webdav_password: '',
+  webdav_path: '',
+  s3_endpoint: '',
+  s3_region: '',
+  s3_bucket: '',
+  s3_access_key: '',
+  s3_secret_key: '',
+  s3_path: '',
+  target_server_id: '',
   enabled: true,
   encrypted: false
 })
@@ -127,34 +256,49 @@ watch(() => props.destination, (newDest) => {
   if (newDest) {
     formData.value = {
       ...newDest,
-      config: typeof newDest.config === 'object' ? JSON.stringify(newDest.config, null, 2) : newDest.config,
+      // Ensure local_path is set from either local_path or path if old data exists
+      local_path: newDest.local_path || (newDest.type === 'local' ? newDest.path : ''),
+      target_server_id: newDest.target_server_id || '',
       encrypted: newDest.encrypted || false
     }
   } else {
     formData.value = {
       name: '',
       type: 'local',
-      path: '',
-      config: '',
+      local_path: '',
+      webdav_url: '',
+      webdav_username: '',
+      webdav_password: '',
+      webdav_path: '',
+      s3_endpoint: '',
+      s3_region: '',
+      s3_bucket: '',
+      s3_access_key: '',
+      s3_secret_key: '',
+      s3_path: '',
+      target_server_id: '',
       enabled: true,
       encrypted: false
     }
   }
 }, { immediate: true })
 
+const loadServers = async () => {
+  try {
+    servers.value = await serversApi.getAll({ enabled: true })
+  } catch (error) {
+    console.error('Failed to load servers:', error)
+  }
+}
+
+onMounted(() => {
+  loadServers()
+})
+
 const handleSubmit = async () => {
   loading.value = true
   try {
     const data = { ...formData.value }
-    if (data.config) {
-      try {
-        data.config = JSON.parse(data.config)
-      } catch (e) {
-        toast.error('配置信息格式错误，请输入有效的 JSON')
-        loading.value = false
-        return
-      }
-    }
 
     if (props.destination?.id) {
       await destinationsApi.update(props.destination.id, data)
@@ -177,12 +321,11 @@ const handleSubmit = async () => {
 .modal {
   display: flex;
   position: fixed;
-  inset: 0;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 50;
+  z-index: 9999;
   background-color: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
   align-items: center;

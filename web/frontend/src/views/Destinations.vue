@@ -57,16 +57,16 @@
         </div>
         <div class="px-4 py-3 bg-brutalist-cream/20">
           <div class="flex items-center text-sm mb-2">
-            <svg class="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="flex-shrink-0 mr-2 h-4 w-4 text-gray-700 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
             </svg>
-            <span class="truncate text-gray-700 font-bold">类型: {{ getTypeLabel(destination.type) }}</span>
+            <span class="text-gray-700 font-bold">类型: {{ getTypeLabel(destination.type) }}</span>
           </div>
           <div class="flex items-center text-sm">
-            <svg class="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="flex-shrink-0 mr-2 h-4 w-4 text-gray-700 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
             </svg>
-            <span class="truncate text-gray-700 font-bold">路径: {{ destination.local_path || destination.webdav_path || destination.path || 'N/A' }}</span>
+            <span class="text-gray-700 font-bold break-all">路径: {{ getDestinationPath(destination) }}</span>
           </div>
         </div>
         <div class="bg-white px-4 py-2 border-t-2 border-black flex justify-end gap-2">
@@ -121,9 +121,23 @@ const getTypeLabel = (type) => {
   const labels = {
     'local': '本地存储',
     'webdav': 'WebDAV',
+    's3': 'S3',
     'server': '官方服务器'
   }
   return labels[type] || type
+}
+
+const getDestinationPath = (dest) => {
+  switch (dest.type) {
+    case 'local':
+      return dest.path || dest.local_path || 'N/A'
+    case 'webdav':
+      return dest.webdav_url ? `${dest.webdav_url}${dest.webdav_path || ''}` : (dest.path || 'N/A')
+    case 's3':
+      return dest.s3_bucket ? `s3://${dest.s3_bucket}${dest.s3_path || ''}` : (dest.path || 'N/A')
+    default:
+      return dest.path || 'N/A'
+  }
 }
 
 const loadDestinations = async () => {

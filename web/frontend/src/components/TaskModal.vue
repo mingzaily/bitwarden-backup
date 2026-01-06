@@ -1,6 +1,7 @@
 <template>
-  <div class="modal show" @click.self="$emit('close')">
-    <div class="modal-content bg-white rounded-lg border-2 border-black shadow-brutalist max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+  <Teleport to="body">
+    <div class="modal show" @click.self="$emit('close')">
+      <div class="modal-content bg-white rounded-lg border-2 border-black shadow-brutalist max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
       <div class="px-6 py-4 border-b-2 border-black bg-brutalist-cream/20">
         <div class="flex items-center justify-between">
           <h3 class="text-lg font-black text-gray-900">{{ task ? '编辑任务' : '新建任务' }}</h3>
@@ -25,20 +26,17 @@
         </div>
 
         <div>
-          <label class="block text-sm font-bold text-gray-900 mb-2">源服务器</label>
-          <select
-            v-model.number="formData.source_server_id"
-            required
-            class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
-          >
-            <option value="" disabled>请选择服务器</option>
-            <option v-for="server in servers" :key="server.id" :value="server.id">
-              {{ server.name }}
-            </option>
-          </select>
-          <p v-if="servers.length === 0" class="mt-1 text-xs text-red-600">
-            ⚠️ 暂无可用服务器，请先创建服务器
-          </p>
+          <CustomSelect
+            v-model="formData.source_server_id"
+            :options="servers.map(s => ({
+              label: s.name,
+              value: s.id,
+              description: s.server_url
+            }))"
+            label="源服务器"
+            placeholder="请选择源服务器"
+            empty-text="⚠️ 暂无可用服务器，请先创建服务器"
+          />
         </div>
 
         <!-- 备份目标多选 -->
@@ -65,6 +63,7 @@
       </form>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -73,6 +72,7 @@ import { tasksApi, serversApi, destinationsApi } from '@/api'
 import { useToast } from '@/composables/useToast'
 import CheckboxGroup from './CheckboxGroup.vue'
 import ToggleButton from './ToggleButton.vue'
+import CustomSelect from './CustomSelect.vue'
 
 const props = defineProps({ task: Object })
 const emit = defineEmits(['close', 'saved'])
@@ -119,7 +119,7 @@ watch(() => props.task, (newTask) => {
 
 const loadServers = async () => {
   try {
-    servers.value = await serversApi.getAll()
+    servers.value = await serversApi.getAll({ enabled: true })
   } catch (error) {
     console.error('Failed to load servers:', error)
   }
@@ -163,12 +163,11 @@ const handleSubmit = async () => {
 .modal {
   display: flex;
   position: fixed;
-  inset: 0;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 50;
+  z-index: 9999;
   background-color: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
   align-items: center;
