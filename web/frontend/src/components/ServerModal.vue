@@ -39,12 +39,12 @@
           label="服务器类型"
         />
 
-        <!-- 官方服务器区域选择 -->
+        <!-- 服务器区域选择 -->
         <div v-if="formData.server_type === 'official'">
           <TabSelector
             v-model="formData.region"
             :options="officialRegions"
-            label="官方服务器区域"
+            label="服务器区域"
           />
         </div>
 

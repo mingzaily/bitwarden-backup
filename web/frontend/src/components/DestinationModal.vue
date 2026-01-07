@@ -179,11 +179,6 @@
           </p>
         </div>
 
-        <div class="space-y-2">
-          <label class="block text-sm font-bold text-gray-900">启用状态</label>
-          <ToggleButton v-model="formData.enabled" label="启用此备份目标" />
-        </div>
-
         <!-- Modal Footer -->
         <div class="flex justify-end gap-3 pt-4 border-t-2 border-black">
           <button
@@ -226,7 +221,7 @@ const storageTypes = [
   { label: '本地存储', value: 'local' },
   { label: 'WebDAV', value: 'webdav' },
   { label: 'S3', value: 's3' },
-  { label: '官方服务器', value: 'server' }
+  { label: '服务器', value: 'server' }
 ]
 
 const servers = ref([])
@@ -300,6 +295,23 @@ const handleSubmit = async () => {
   try {
     const data = { ...formData.value }
 
+    // 调试日志
+    console.log('提交数据:', data)
+    console.log('目标服务器ID:', data.target_server_id)
+
+    // 新增时不传 enabled 参数（后端默认为 true）
+    if (!props.destination?.id) {
+      delete data.enabled
+    }
+
+    // 修复：删除空值的 target_server_id（避免后端类型不匹配）
+    if (!data.target_server_id || data.target_server_id === '') {
+      delete data.target_server_id
+    } else {
+      // 确保 target_server_id 是数字类型
+      data.target_server_id = Number(data.target_server_id)
+    }
+
     if (props.destination?.id) {
       await destinationsApi.update(props.destination.id, data)
       toast.success('备份目标已更新')
@@ -309,8 +321,8 @@ const handleSubmit = async () => {
     }
     emit('saved')
   } catch (error) {
-    console.error('Failed to save destination:', error)
-    toast.error('保存失败')
+    console.error('保存失败:', error)
+    toast.error(`保存失败: ${error.message}`)
   } finally {
     loading.value = false
   }

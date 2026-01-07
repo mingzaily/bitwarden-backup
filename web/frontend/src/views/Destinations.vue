@@ -35,62 +35,50 @@
         :key="destination.id"
         class="bg-white overflow-hidden rounded-lg border-2 border-black shadow-brutalist hover:shadow-brutalist-hover transition-all"
       >
-        <div class="px-4 py-3 flex justify-between items-center border-b-2 border-black bg-white">
-          <div class="flex items-center gap-2">
-            <div class="h-8 w-8 rounded bg-brutalist-green flex items-center justify-center text-white font-black text-sm border-2 border-black">
-              {{ destination.name.charAt(0).toUpperCase() }}
-            </div>
-            <h3 class="text-base font-black text-gray-900 truncate" :title="destination.name">
-              {{ destination.name }}
-            </h3>
-          </div>
-          <div class="flex items-center gap-2">
-            <span
-              :class="[
-                'px-2 py-1 text-xs font-bold rounded border-2 border-black',
-                destination.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-              ]"
-            >
-              {{ destination.enabled ? '已启用' : '已禁用' }}
-            </span>
-          </div>
-        </div>
         <div class="px-4 py-3 bg-brutalist-cream/20">
-          <div class="flex items-center text-sm mb-2">
-            <svg class="flex-shrink-0 mr-2 h-4 w-4 text-gray-700 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
-            </svg>
-            <span class="text-gray-700 font-bold">类型: {{ getTypeLabel(destination.type) }}</span>
+          <div class="flex items-center justify-between">
+            <!-- 左侧：目标信息 -->
+            <div class="flex-1">
+              <h3 class="text-base font-black text-gray-900 mb-2">{{ destination.name }}</h3>
+              <div class="flex items-center text-sm mb-1">
+                <svg class="flex-shrink-0 mr-2 h-4 w-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                </svg>
+                <span class="text-gray-700 font-bold">类型: {{ getTypeLabel(destination.type) }}</span>
+              </div>
+              <div class="flex items-center text-sm">
+                <svg class="flex-shrink-0 mr-2 h-4 w-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <span class="text-gray-700 font-bold break-all">路径: {{ getDestinationPath(destination) }}</span>
+              </div>
+            </div>
+
+            <!-- 右侧：操作按钮 -->
+            <div class="flex items-center gap-2 ml-4">
+              <button
+                @click="toggleDestination(destination.id, !destination.enabled)"
+                :class="[
+                  'px-3 py-1 text-sm font-bold rounded border-2 border-black transition-all',
+                  destination.enabled ? 'text-gray-700 hover:bg-gray-50' : 'text-brutalist-green hover:bg-green-50'
+                ]"
+              >
+                {{ destination.enabled ? '禁用' : '启用' }}
+              </button>
+              <button
+                @click="editDestination(destination)"
+                class="px-3 py-1 text-sm font-bold text-brutalist-blue hover:bg-blue-50 rounded border-2 border-black transition-all"
+              >
+                编辑
+              </button>
+              <button
+                @click="deleteDestination(destination.id)"
+                class="px-3 py-1 text-sm font-bold text-brutalist-red hover:bg-red-50 rounded border-2 border-black transition-all"
+              >
+                删除
+              </button>
+            </div>
           </div>
-          <div class="flex items-center text-sm">
-            <svg class="flex-shrink-0 mr-2 h-4 w-4 text-gray-700 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-            </svg>
-            <span class="text-gray-700 font-bold break-all">路径: {{ getDestinationPath(destination) }}</span>
-          </div>
-        </div>
-        <div class="bg-white px-4 py-2 border-t-2 border-black flex justify-end gap-2">
-          <button
-            @click="toggleDestination(destination.id, !destination.enabled)"
-            :class="[
-              'px-3 py-1 text-sm font-bold rounded border-2 border-black transition-all',
-              destination.enabled ? 'text-gray-700 hover:bg-gray-50' : 'text-brutalist-green hover:bg-green-50'
-            ]"
-          >
-            {{ destination.enabled ? '禁用' : '启用' }}
-          </button>
-          <button
-            @click="editDestination(destination)"
-            class="px-3 py-1 text-sm font-bold text-brutalist-blue hover:bg-blue-50 rounded border-2 border-black transition-all"
-          >
-            编辑
-          </button>
-          <button
-            @click="deleteDestination(destination.id)"
-            class="px-3 py-1 text-sm font-bold text-brutalist-red hover:bg-red-50 rounded border-2 border-black transition-all"
-          >
-            删除
-          </button>
         </div>
       </div>
     </div>
@@ -122,7 +110,7 @@ const getTypeLabel = (type) => {
     'local': '本地存储',
     'webdav': 'WebDAV',
     's3': 'S3',
-    'server': '官方服务器'
+    'server': '服务器'
   }
   return labels[type] || type
 }

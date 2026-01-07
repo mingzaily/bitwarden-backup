@@ -51,11 +51,6 @@
           empty-text="暂无可用备份目标，请先创建备份目标"
         />
 
-        <div class="space-y-2">
-          <label class="block text-sm font-bold text-gray-900">启用状态</label>
-          <ToggleButton v-model="formData.enabled" label="启用此任务" />
-        </div>
-
         <div class="flex justify-end gap-3 pt-4 border-t-2 border-black">
           <button type="button" @click="$emit('close')" class="px-4 py-2 text-sm font-bold text-gray-700 bg-white border-2 border-black rounded-lg hover:bg-gray-50 transition-all">取消</button>
           <button type="submit" :disabled="loading" class="btn-brutalist px-4 py-2 text-sm rounded-lg disabled:opacity-50">{{ loading ? '保存中...' : '保存' }}</button>
@@ -95,7 +90,7 @@ const getTypeLabel = (type) => {
     'local': '本地存储',
     'webdav': 'WebDAV',
     's3': 'S3',
-    'server': '官方服务器'
+    'server': '服务器'
   }
   return labels[type] || type
 }
@@ -142,11 +137,18 @@ onMounted(() => {
 const handleSubmit = async () => {
   loading.value = true
   try {
+    const data = { ...formData.value }
+
+    // 新增时不传 enabled 参数（后端默认为 true）
+    if (!props.task?.id) {
+      delete data.enabled
+    }
+
     if (props.task?.id) {
-      await tasksApi.update(props.task.id, formData.value)
+      await tasksApi.update(props.task.id, data)
       toast.success('任务已更新')
     } else {
-      await tasksApi.create(formData.value)
+      await tasksApi.create(data)
       toast.success('任务已创建')
     }
     emit('saved')

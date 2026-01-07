@@ -1,12 +1,8 @@
 // API 服务层
-import { useToast } from '@/composables/useToast'
-
 const API_BASE = '/api'
 
 const handleResponse = async (response) => {
   if (!response.ok) {
-    const toast = useToast()
-    toast.error(`请求失败: ${response.statusText}`)
     throw new Error(`HTTP ${response.status}`)
   }
   return response.json()
