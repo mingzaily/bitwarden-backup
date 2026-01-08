@@ -117,7 +117,7 @@
 import { ref, onMounted } from 'vue'
 import { destinationsApi } from '@/api'
 import { useToast } from '@/composables/useToast'
-import DestinationModal from '@/components/DestinationModal.vue'
+import DestinationModal from '@/components/features/Destination/DestinationModal.vue'
 
 const toast = useToast()
 const destinations = ref([])

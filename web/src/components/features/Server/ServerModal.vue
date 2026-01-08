@@ -131,7 +131,7 @@
 import { ref, watch } from 'vue'
 import { serversApi } from '@/api'
 import { useToast } from '@/composables/useToast'
-import TabSelector from './TabSelector.vue'
+import TabSelector from '@/components/ui/TabSelector.vue'
 
 const props = defineProps({
   server: Object

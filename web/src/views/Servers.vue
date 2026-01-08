@@ -115,7 +115,7 @@
 import { ref, onMounted } from 'vue'
 import { serversApi } from '@/api'
 import { useToast } from '@/composables/useToast'
-import ServerModal from '@/components/ServerModal.vue'
+import ServerModal from '@/components/features/Server/ServerModal.vue'
 
 const toast = useToast()
 const servers = ref([])

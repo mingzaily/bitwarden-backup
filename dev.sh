@@ -7,7 +7,7 @@ set -e
 echo "🚀 开始构建 Vue 前端..."
 
 # 进入前端目录
-cd web/frontend
+cd web
 
 # 检查 node_modules 是否存在
 if [ ! -d "node_modules" ]; then
@@ -19,7 +19,7 @@ fi
 echo "🔨 构建前端..."
 npm run build
 
-cd ../..
+cd ..
 
 echo "✅ 前端构建完成！"
 echo ""

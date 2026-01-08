@@ -65,9 +65,9 @@
 import { ref, watch, onMounted } from 'vue'
 import { tasksApi, serversApi, destinationsApi } from '@/api'
 import { useToast } from '@/composables/useToast'
-import CheckboxGroup from './CheckboxGroup.vue'
-import ToggleButton from './ToggleButton.vue'
-import CustomSelect from './CustomSelect.vue'
+import CheckboxGroup from '@/components/ui/CheckboxGroup.vue'
+import ToggleButton from '@/components/ui/ToggleButton.vue'
+import CustomSelect from '@/components/ui/CustomSelect.vue'
 
 const props = defineProps({ task: Object })
 const emit = defineEmits(['close', 'saved'])

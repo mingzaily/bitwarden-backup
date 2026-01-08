@@ -114,8 +114,8 @@
 import { ref, onMounted } from 'vue'
 import { tasksApi } from '@/api'
 import { useToast } from '@/composables/useToast'
-import TaskModal from '@/components/TaskModal.vue'
-import BackupFlow from '@/components/BackupFlow.vue'
+import TaskModal from '@/components/features/Task/TaskModal.vue'
+import BackupFlow from '@/components/features/Task/BackupFlow.vue'
 
 const toast = useToast()
 const tasks = ref([])

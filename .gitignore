@@ -39,8 +39,7 @@ Thumbs.db
 .ace-tool/
 
 # Vue 前端
-web/frontend/node_modules/
-web/frontend/dist/
+web/node_modules/
 web/dist/
 *.local
 

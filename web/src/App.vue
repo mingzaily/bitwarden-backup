@@ -46,7 +46,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import ToastContainer from '@/components/ToastContainer.vue'
+import ToastContainer from '@/components/ui/ToastContainer.vue'
 import { setToastInstance } from '@/composables/useToast'
 
 const tabs = ref([

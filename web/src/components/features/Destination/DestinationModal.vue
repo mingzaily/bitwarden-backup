@@ -227,9 +227,9 @@
 import { ref, watch, onMounted } from 'vue'
 import { destinationsApi, serversApi } from '@/api'
 import { useToast } from '@/composables/useToast'
-import TabSelector from './TabSelector.vue'
-import ToggleButton from './ToggleButton.vue'
-import CustomSelect from './CustomSelect.vue'
+import TabSelector from '@/components/ui/TabSelector.vue'
+import ToggleButton from '@/components/ui/ToggleButton.vue'
+import CustomSelect from '@/components/ui/CustomSelect.vue'
 
 const props = defineProps({
   destination: Object

@@ -27,8 +27,8 @@
 </template>
 
 <script setup>
-import ServerTag from './ServerTag.vue'
-import DestinationList from './DestinationList.vue'
+import ServerTag from '@/components/features/Server/ServerTag.vue'
+import DestinationList from '@/components/features/Destination/DestinationList.vue'
 
 const props = defineProps({
   sourceServer: {
