@@ -52,7 +52,7 @@ import { setToastInstance } from '@/composables/useToast'
 const tabs = ref([
   { path: '/servers', label: '服务器列表' },
   { path: '/destinations', label: '备份目标' },
-  { path: '/tasks', label: '定时任务' },
+  { path: '/tasks', label: '备份任务' },
   { path: '/logs', label: '运行日志' }
 ])
 

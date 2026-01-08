@@ -56,22 +56,32 @@ func (s *Scheduler) performBackupToDestinations(task database.BackupTask, backup
 	timestamp := time.Now().Format("20060102_150405")
 	var tempFiles []string
 
-	// 检查是否需要加密和非加密两种格式
+	// 检查是否需要加密和非加密两种格式，并收集加密密码
 	needEncrypted := false
 	needPlain := false
+	var encryptionPassword string
 	for _, dest := range task.Destinations {
 		if !dest.Enabled {
 			continue
 		}
-		if dest.Type == "local" || dest.Type == "webdav" {
+		if dest.Type == "local" || dest.Type == "webdav" || dest.Type == "s3" {
 			if dest.Encrypted {
 				needEncrypted = true
+				// 使用第一个启用加密的目标的密码
+				if encryptionPassword == "" && dest.EncryptionPassword != "" {
+					encryptionPassword = dest.EncryptionPassword
+				}
 			} else {
 				needPlain = true
 			}
 		} else if dest.Type == "server" {
 			needPlain = true
 		}
+	}
+
+	// 验证加密密码
+	if needEncrypted && encryptionPassword == "" {
+		return fmt.Errorf("encryption password is required for encrypted backup destinations")
 	}
 
 	// 导出非加密版本
@@ -89,7 +99,7 @@ func (s *Scheduler) performBackupToDestinations(task database.BackupTask, backup
 	var encryptedFile string
 	if needEncrypted {
 		encryptedFile = filepath.Join(getTempDir(), fmt.Sprintf("backup_%s_%s_encrypted.json", task.Name, timestamp))
-		if err := client.Export(encryptedFile, "encrypted_json"); err != nil {
+		if err := client.Export(encryptedFile, "encrypted_json", encryptionPassword); err != nil {
 			client.Logout()
 			return fmt.Errorf("failed to export encrypted: %w", err)
 		}
@@ -108,7 +118,7 @@ func (s *Scheduler) performBackupToDestinations(task database.BackupTask, backup
 		}
 
 		sourceFile := plainFile
-		if (dest.Type == "local" || dest.Type == "webdav") && dest.Encrypted {
+		if (dest.Type == "local" || dest.Type == "webdav" || dest.Type == "s3") && dest.Encrypted {
 			sourceFile = encryptedFile
 		}
 

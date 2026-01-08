@@ -31,14 +31,19 @@
       <div
         v-for="server in servers"
         :key="server.id"
-        class="bg-white overflow-hidden rounded-lg border-2 border-black shadow-brutalist hover:shadow-brutalist-hover transition-all"
+        :class="[
+          'bg-white overflow-hidden rounded-lg border-2 border-black shadow-brutalist hover:shadow-brutalist-hover transition-all',
+          'border-l-4',
+          server.enabled ? 'border-l-brutalist-green' : 'border-l-gray-400',
+          !server.enabled && 'opacity-50'
+        ]"
       >
-        <div class="px-4 py-3 bg-brutalist-cream/20">
+        <div class="px-6 py-4 bg-brutalist-cream/20 min-h-[90px]">
           <div class="flex items-center justify-between">
             <!-- 左侧：服务器信息 -->
-            <div class="flex-1">
-              <div class="flex items-center gap-2 mb-2">
-                <h3 class="text-base font-black text-gray-900">{{ server.name }}</h3>
+            <div class="flex-1 space-y-2">
+              <div class="flex items-center gap-2 mb-3">
+                <h3 class="text-base font-black text-gray-900 leading-6">{{ server.name }}</h3>
                 <!-- 服务器类型标签 -->
                 <span
                   :class="[
@@ -51,17 +56,17 @@
                   {{ isOfficialServer(server) ? '官方' : '自建' }}
                 </span>
               </div>
-              <div class="flex items-center text-sm mb-1">
+              <div class="flex items-center text-sm mb-2">
                 <svg class="flex-shrink-0 mr-2 h-4 w-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path>
                 </svg>
-                <span class="text-gray-700 font-bold break-all">{{ server.server_url || server.url }}</span>
+                <span class="text-gray-700 font-bold break-all leading-4">{{ server.server_url || server.url }}</span>
               </div>
               <div class="flex items-center text-sm">
                 <svg class="flex-shrink-0 mr-2 h-4 w-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                 </svg>
-                <span class="text-gray-700 font-bold break-all">ID: {{ server.client_id || 'N/A' }}</span>
+                <span class="text-gray-700 font-bold break-all leading-4">ID: {{ server.client_id || 'N/A' }}</span>
               </div>
             </div>
 

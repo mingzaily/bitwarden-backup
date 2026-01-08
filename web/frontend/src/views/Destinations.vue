@@ -33,24 +33,44 @@
       <div
         v-for="destination in destinations"
         :key="destination.id"
-        class="bg-white overflow-hidden rounded-lg border-2 border-black shadow-brutalist hover:shadow-brutalist-hover transition-all"
+        :class="[
+          'bg-white overflow-hidden rounded-lg border-2 border-black shadow-brutalist hover:shadow-brutalist-hover transition-all',
+          'border-l-4',
+          destination.enabled ? 'border-l-brutalist-green' : 'border-l-gray-400',
+          !destination.enabled && 'opacity-50'
+        ]"
       >
-        <div class="px-4 py-3 bg-brutalist-cream/20">
+        <div class="px-6 py-4 bg-brutalist-cream/20 min-h-[90px]">
           <div class="flex items-center justify-between">
             <!-- 左侧：目标信息 -->
-            <div class="flex-1">
-              <h3 class="text-base font-black text-gray-900 mb-2">{{ destination.name }}</h3>
-              <div class="flex items-center text-sm mb-1">
-                <svg class="flex-shrink-0 mr-2 h-4 w-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
-                </svg>
-                <span class="text-gray-700 font-bold">类型: {{ getTypeLabel(destination.type) }}</span>
+            <div class="flex-1 space-y-2">
+              <div class="flex items-center gap-2 mb-3">
+                <h3 class="text-base font-black text-gray-900 leading-6">{{ destination.name }}</h3>
+                <!-- 类型徽章 -->
+                <span :class="getTypeBadgeClass(destination.type)">
+                  {{ destination.type_label || getTypeLabel(destination.type) }}
+                </span>
+                <!-- 加密状态图标（仅非服务器类型显示） -->
+                <span
+                  v-if="destination.type !== 'server' && destination.encrypted"
+                  class="text-lg cursor-help"
+                  title="已启用 AES-256-GCM 加密"
+                >
+                  🔒
+                </span>
               </div>
-              <div class="flex items-center text-sm">
+              <div class="flex items-center text-sm mb-2">
                 <svg class="flex-shrink-0 mr-2 h-4 w-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                 </svg>
-                <span class="text-gray-700 font-bold break-all">路径: {{ getDestinationPath(destination) }}</span>
+                <span class="text-gray-700 font-bold break-all leading-4">{{ destination.display_path || getDestinationPath(destination) }}</span>
+              </div>
+              <!-- 创建时间 -->
+              <div class="flex items-center text-sm">
+                <svg class="flex-shrink-0 mr-2 h-4 w-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span class="text-gray-600 font-bold leading-4">创建于 {{ destination.created_at }}</span>
               </div>
             </div>
 
@@ -126,6 +146,17 @@ const getDestinationPath = (dest) => {
     default:
       return dest.path || 'N/A'
   }
+}
+
+const getTypeBadgeClass = (type) => {
+  const baseClasses = 'px-2 py-0.5 text-xs font-bold rounded border-2 border-black'
+  const typeClasses = {
+    'local': 'bg-brutalist-green text-white',
+    'webdav': 'bg-brutalist-blue text-white',
+    's3': 'bg-brutalist-orange text-white',
+    'server': 'bg-gray-800 text-white'
+  }
+  return `${baseClasses} ${typeClasses[type] || 'bg-gray-100 text-gray-800'}`
 }
 
 const loadDestinations = async () => {

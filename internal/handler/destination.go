@@ -14,7 +14,14 @@ func GetDestinations(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, destinations)
+
+	// 转换为 DTO
+	responses := make([]database.BackupDestinationResponse, len(destinations))
+	for i, dest := range destinations {
+		responses[i] = dest.ToResponse()
+	}
+
+	c.JSON(http.StatusOK, responses)
 }
 
 // GetDestination 获取单个备份目标
@@ -25,7 +32,7 @@ func GetDestination(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Destination not found"})
 		return
 	}
-	c.JSON(http.StatusOK, destination)
+	c.JSON(http.StatusOK, destination.ToResponse())
 }
 
 // ToggleDestination 切换备份目标启用状态

@@ -20,9 +20,9 @@
         </div>
 
         <div>
-          <label class="block text-sm font-bold text-gray-900 mb-2">Cron 表达式</label>
-          <input v-model="formData.cron_expression" type="text" required class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue" placeholder="0 0 2 * * *" />
-          <p class="mt-1 text-xs text-gray-600">示例: 0 0 2 * * * (每天凌晨2点)</p>
+          <label class="block text-sm font-bold text-gray-900 mb-2">Cron 表达式（可选）</label>
+          <input v-model="formData.cron_expression" type="text" class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue" placeholder="0 0 2 * * *（可选，留空则仅支持手动触发）" />
+          <p class="mt-1 text-xs text-gray-600">💡 留空则创建手动触发任务，填写则自动定时执行。示例: 0 0 2 * * * (每天凌晨2点)</p>
         </div>
 
         <div>
@@ -97,9 +97,13 @@ const getTypeLabel = (type) => {
 
 watch(() => props.task, (newTask) => {
   if (newTask) {
+    console.log('TaskModal: Loading task', newTask)
+    const destinationIds = newTask.destinations?.map(d => d.id) || []
+    console.log('TaskModal: Extracted destination IDs', destinationIds)
+
     formData.value = {
       ...newTask,
-      destination_ids: newTask.destinations?.map(d => d.id) || []
+      destination_ids: destinationIds
     }
   } else {
     formData.value = {

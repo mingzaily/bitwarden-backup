@@ -84,10 +84,13 @@ type BackupTask struct {
 	ID               uint      `gorm:"primaryKey" json:"id"`
 	Name             string    `gorm:"size:100;not null" json:"name"`
 	SourceServerID   uint      `gorm:"not null" json:"source_server_id"`
-	CronExpression   string    `gorm:"size:100;not null" json:"cron_expression"`
+	CronExpression   string    `gorm:"size:100" json:"cron_expression"` // 可选，为空则仅支持手动触发
 	Enabled          bool      `gorm:"default:true" json:"enabled"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
+
+	// 关联的源服务器
+	SourceServer     ServerConfig `json:"source_server"`
 
 	// 关联的备份目标（多对多关系）
 	Destinations     []BackupDestination `gorm:"many2many:task_destinations;" json:"destinations"`
@@ -119,8 +122,9 @@ type BackupDestination struct {
 	// 目标服务器配置
 	TargetServerID *uint     `json:"target_server_id"`
 
-	// 加密选项（仅本地和WebDAV有效）
-	Encrypted      bool      `gorm:"default:false" json:"encrypted"`
+	// 加密选项（仅本地、WebDAV 和 S3 有效）
+	Encrypted           bool   `gorm:"default:false" json:"encrypted"`
+	EncryptionPassword  string `gorm:"size:500" json:"encryption_password"` // 加密备份的密码
 
 	Enabled        bool      `gorm:"default:true" json:"enabled"`
 	CreatedAt      time.Time `json:"created_at"`
@@ -156,6 +160,15 @@ func (d *BackupDestination) BeforeSave(tx *gorm.DB) error {
 		d.S3SecretKey = encrypted
 	}
 
+	// 加密 EncryptionPassword
+	if d.EncryptionPassword != "" {
+		encrypted, err := crypto.Encrypt(d.EncryptionPassword)
+		if err != nil {
+			return err
+		}
+		d.EncryptionPassword = encrypted
+	}
+
 	return nil
 }
 
@@ -186,6 +199,15 @@ func (d *BackupDestination) AfterFind(tx *gorm.DB) error {
 			return err
 		}
 		d.S3SecretKey = decrypted
+	}
+
+	// 解密 EncryptionPassword
+	if d.EncryptionPassword != "" {
+		decrypted, err := crypto.Decrypt(d.EncryptionPassword)
+		if err != nil {
+			return err
+		}
+		d.EncryptionPassword = decrypted
 	}
 
 	return nil

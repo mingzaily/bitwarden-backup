@@ -9,6 +9,7 @@ type Config struct {
 	ServerPort string
 	DBPath     string
 	LogLevel   string
+	AppEnv     string
 }
 
 func Load() *Config {
@@ -16,6 +17,7 @@ func Load() *Config {
 		ServerPort: getEnv("SERVER_PORT", "8080"),
 		DBPath:     getEnv("DB_PATH", "./data/bitwarden-backup.db"),
 		LogLevel:   getEnv("LOG_LEVEL", "info"),
+		AppEnv:     getEnv("APP_ENV", "production"),
 	}
 }
 

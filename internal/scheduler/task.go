@@ -15,12 +15,24 @@ func (s *Scheduler) LoadTasks() error {
 		return fmt.Errorf("failed to load tasks: %w", err)
 	}
 
+	scheduledCount := 0
+	manualCount := 0
+
 	for _, task := range tasks {
+		// 跳过没有 Cron 表达式的任务（手动触发任务）
+		if task.CronExpression == "" {
+			log.Printf("Skipping manual task: %s (no cron expression)", task.Name)
+			manualCount++
+			continue
+		}
+
 		if err := s.AddTask(task); err != nil {
 			log.Printf("Failed to add task %s: %v", task.Name, err)
+		} else {
+			scheduledCount++
 		}
 	}
 
-	log.Printf("Loaded %d tasks", len(tasks))
+	log.Printf("Loaded %d scheduled tasks, %d manual tasks", scheduledCount, manualCount)
 	return nil
 }

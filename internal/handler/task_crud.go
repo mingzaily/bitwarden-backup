@@ -12,7 +12,7 @@ func CreateTask(c *gin.Context) {
 	var input struct {
 		Name             string `json:"name" binding:"required"`
 		SourceServerID   uint   `json:"source_server_id" binding:"required"`
-		CronExpression   string `json:"cron_expression" binding:"required"`
+		CronExpression   string `json:"cron_expression"` // 可选，为空则仅支持手动触发
 		Enabled          bool   `json:"enabled"`
 		DestinationIDs   []uint `json:"destination_ids"`
 	}

@@ -23,51 +23,83 @@
     </div>
 
     <div v-else class="grid gap-4">
-      <div v-for="task in tasks" :key="task.id" class="bg-white overflow-hidden rounded-lg border-2 border-black shadow-brutalist hover:shadow-brutalist-hover transition-all">
-        <div class="px-4 py-3 bg-brutalist-cream/20">
+      <div
+        v-for="task in tasks"
+        :key="task.id"
+        :class="[
+          'bg-white overflow-hidden rounded-lg border-2 border-black shadow-brutalist hover:shadow-brutalist-hover transition-all',
+          'border-l-4',
+          task.enabled ? 'border-l-brutalist-green' : 'border-l-gray-400',
+          !task.enabled && 'opacity-50'
+        ]"
+      >
+        <div class="px-6 py-4 bg-brutalist-cream/20 min-h-[90px]">
           <div class="flex items-center justify-between">
             <!-- 左侧：任务信息 -->
-            <div class="flex-1">
-              <h3 class="text-base font-black text-gray-900 mb-2">{{ task.name }}</h3>
+            <div class="flex-1 space-y-2">
+              <div class="flex items-center gap-2 mb-3">
+                <h3 class="text-base font-black text-gray-900 leading-6">{{ task.name }}</h3>
+                <!-- 任务类型标签 -->
+                <span
+                  :class="[
+                    'px-2 py-0.5 text-xs font-bold rounded border-2 border-black',
+                    task.cron_expression ? 'bg-brutalist-blue text-white' : 'bg-gray-300 text-gray-700'
+                  ]"
+                >
+                  {{ task.cron_expression ? '定时' : '手动' }}
+                </span>
+              </div>
+
+              <!-- 备份流程 -->
+              <BackupFlow
+                :source-server="task.source_server"
+                :destinations="task.destinations"
+                class="mb-3"
+              />
+
               <div class="flex items-center text-sm">
                 <svg class="flex-shrink-0 mr-2 h-4 w-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
-                <span class="text-gray-700 font-bold">Cron: {{ task.cron_expression }}</span>
+                <span class="text-gray-700 font-bold leading-4">
+                  {{ task.cron_expression ? `Cron: ${task.cron_expression}` : '手动触发' }}
+                </span>
               </div>
             </div>
 
             <!-- 右侧：操作按钮 -->
-            <div class="flex items-center gap-2 ml-4">
-              <button
-                @click="toggleTask(task.id, !task.enabled)"
-                :class="[
-                  'px-3 py-1 text-sm font-bold rounded border-2 border-black transition-all',
-                  task.enabled
-                    ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                ]"
-              >
-                {{ task.enabled ? '已启用' : '已禁用' }}
-              </button>
-              <button
-                @click="executeTask(task.id)"
-                class="px-3 py-1 text-sm font-bold text-brutalist-green hover:bg-green-50 rounded border-2 border-black transition-all"
-              >
-                立即执行
-              </button>
-              <button
-                @click="editTask(task)"
-                class="px-3 py-1 text-sm font-bold text-brutalist-blue hover:bg-blue-50 rounded border-2 border-black transition-all"
-              >
-                编辑
-              </button>
-              <button
-                @click="deleteTask(task.id)"
-                class="px-3 py-1 text-sm font-bold text-brutalist-red hover:bg-red-50 rounded border-2 border-black transition-all"
-              >
-                删除
-              </button>
+            <div class="ml-4 shrink-0">
+              <div class="inline-flex items-center overflow-hidden rounded border-2 border-black divide-x-2 divide-black">
+                <button
+                  @click="executeTask(task.id)"
+                  class="px-3 py-1 text-sm font-bold text-brutalist-green hover:bg-green-50 transition-colors whitespace-nowrap"
+                >
+                  立即执行
+                </button>
+                <button
+                  @click="toggleTask(task.id, !task.enabled)"
+                  :class="[
+                    'px-3 py-1 text-sm font-bold transition-colors whitespace-nowrap',
+                    task.enabled
+                      ? 'text-gray-700 hover:bg-gray-50'
+                      : 'text-brutalist-green hover:bg-green-50'
+                  ]"
+                >
+                  {{ task.enabled ? '禁用' : '启用' }}
+                </button>
+                <button
+                  @click="editTask(task)"
+                  class="px-3 py-1 text-sm font-bold text-brutalist-blue hover:bg-blue-50 transition-colors whitespace-nowrap"
+                >
+                  编辑
+                </button>
+                <button
+                  @click="deleteTask(task.id)"
+                  class="px-3 py-1 text-sm font-bold text-brutalist-red hover:bg-red-50 transition-colors whitespace-nowrap"
+                >
+                  删除
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -83,6 +115,7 @@ import { ref, onMounted } from 'vue'
 import { tasksApi } from '@/api'
 import { useToast } from '@/composables/useToast'
 import TaskModal from '@/components/TaskModal.vue'
+import BackupFlow from '@/components/BackupFlow.vue'
 
 const toast = useToast()
 const tasks = ref([])
@@ -108,12 +141,30 @@ const editTask = (task) => {
 }
 
 const toggleTask = async (id, enabled) => {
+  // 保存原始状态用于回滚
+  const taskIndex = tasks.value.findIndex(t => t.id === id)
+  const originalEnabled = tasks.value[taskIndex]?.enabled
+
   try {
+    // 立即更新本地状态（乐观更新）
+    if (taskIndex !== -1) {
+      tasks.value[taskIndex].enabled = enabled
+    }
+
+    // 调用 API 更新
     await tasksApi.update(id, { enabled })
     toast.success(enabled ? '任务已启用' : '任务已禁用')
+
+    // 后台同步数据（确保数据一致性）
     loadTasks()
   } catch (error) {
     console.error('Failed to toggle task:', error)
+
+    // 错误时回滚本地状态
+    if (taskIndex !== -1 && originalEnabled !== undefined) {
+      tasks.value[taskIndex].enabled = originalEnabled
+    }
+
     toast.error('操作失败')
   }
 }

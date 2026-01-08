@@ -13,7 +13,7 @@ func main() {
 	cfg := config.Load()
 
 	// 初始化数据库
-	if err := database.Init(cfg.DBPath); err != nil {
+	if err := database.Init(cfg.DBPath, cfg); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
@@ -26,7 +26,7 @@ func main() {
 	defer sched.Stop()
 
 	// 初始化 Gin 路由
-	r := setupRouter()
+	r := setupRouter(cfg)
 
 	// 启动服务器
 	log.Printf("Server starting on port %s", cfg.ServerPort)

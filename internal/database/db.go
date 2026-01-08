@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/mingzaily/bitwarden-backup/internal/config"
 	"github.com/mingzaily/bitwarden-backup/internal/crypto"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -16,7 +17,7 @@ import (
 var DB *gorm.DB
 
 // Init 初始化数据库连接
-func Init(dbPath string) error {
+func Init(dbPath string, cfg *config.Config) error {
 	// 初始化加密系统
 	if err := crypto.InitEncryption(); err != nil {
 		return fmt.Errorf("failed to initialize encryption: %w", err)
@@ -28,13 +29,23 @@ func Init(dbPath string) error {
 		return fmt.Errorf("failed to create db directory: %w", err)
 	}
 
+	// 根据环境设置 GORM 日志级别
+	var logLevel logger.LogLevel
+	if cfg.AppEnv == "dev" {
+		logLevel = logger.Info
+	} else {
+		logLevel = logger.Warn
+	}
+
 	// 使用纯 Go SQLite 驱动（不需要 CGO）
-	dsn := dbPath + "?_pragma=foreign_keys(1)"
+	// 禁用外键约束，关系维护在代码层面
+	dsn := dbPath + "?_pragma=foreign_keys(0)"
 	db, err := gorm.Open(sqlite.Dialector{
 		DriverName: "sqlite",
 		DSN:        dsn,
 	}, &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Default.LogMode(logLevel),
+		DisableForeignKeyConstraintWhenMigrating: true,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to connect database: %w", err)

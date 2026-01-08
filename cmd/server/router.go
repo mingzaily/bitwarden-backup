@@ -6,11 +6,25 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mingzaily/bitwarden-backup/internal/config"
 	"github.com/mingzaily/bitwarden-backup/internal/handler"
 )
 
-func setupRouter() *gin.Engine {
-	r := gin.Default()
+func setupRouter(cfg *config.Config) *gin.Engine {
+	// 根据环境设置 Gin 模式
+	if cfg.AppEnv == "dev" {
+		gin.SetMode(gin.DebugMode)
+		r := gin.Default() // 包含访问日志
+		return setupRoutes(r)
+	} else {
+		gin.SetMode(gin.ReleaseMode)
+		r := gin.New()
+		r.Use(gin.Recovery()) // 仅保留 panic 恢复
+		return setupRoutes(r)
+	}
+}
+
+func setupRoutes(r *gin.Engine) *gin.Engine {
 
 	// 静态资源（Vue 构建产物）
 	r.Static("/assets", "./web/dist/assets")

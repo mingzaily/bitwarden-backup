@@ -88,8 +88,11 @@
               v-model="formData.webdav_path"
               type="text"
               class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
-              placeholder="/backups"
+              placeholder="/bitwarden-backup（默认）"
             />
+            <p class="text-xs text-gray-600 mt-1">
+              💡 留空将使用默认路径 /bitwarden-backup
+            </p>
           </div>
         </div>
 
@@ -150,8 +153,11 @@
               v-model="formData.s3_path"
               type="text"
               class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
-              placeholder="/backups"
+              placeholder="/bitwarden-backup（默认）"
             />
+            <p class="text-xs text-gray-600 mt-1">
+              💡 留空将使用默认路径 /bitwarden-backup
+            </p>
           </div>
         </div>
 
@@ -171,12 +177,27 @@
         </div>
 
         <!-- 加密选项（仅本地和 WebDAV 和 S3 显示） -->
-        <div v-if="['local', 'webdav', 's3'].includes(formData.type)" class="space-y-2">
+        <div v-if="['local', 'webdav', 's3'].includes(formData.type)" class="space-y-3">
           <label class="block text-sm font-bold text-gray-900">备份文件加密</label>
           <ToggleButton v-model="formData.encrypted" label="加密备份文件" />
           <p class="text-xs text-gray-600 mt-1">
-            💡 启用后将使用 Bitwarden CLI 的 <code class="px-1 py-0.5 bg-gray-100 rounded">--format encrypted_json</code> 导出加密文件
+            💡 启用后将使用您设置的密码对备份文件进行加密保护
           </p>
+
+          <!-- 加密密码输入（仅在启用加密时显示） -->
+          <div v-if="formData.encrypted" class="mt-3">
+            <label class="block text-sm font-bold text-gray-900 mb-2">加密密码</label>
+            <input
+              v-model="formData.encryption_password"
+              type="password"
+              required
+              class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
+              placeholder="请输入加密密码"
+            />
+            <p class="text-xs text-gray-600 mt-1">
+              💡 此密码用于加密导出的备份文件，解密时需要使用相同密码
+            </p>
+          </div>
         </div>
 
         <!-- Modal Footer -->
@@ -242,7 +263,8 @@ const formData = ref({
   s3_path: '',
   target_server_id: '',
   enabled: true,
-  encrypted: false
+  encrypted: false,
+  encryption_password: ''
 })
 
 const loading = ref(false)
@@ -254,7 +276,8 @@ watch(() => props.destination, (newDest) => {
       // Ensure local_path is set from either local_path or path if old data exists
       local_path: newDest.local_path || (newDest.type === 'local' ? newDest.path : ''),
       target_server_id: newDest.target_server_id || '',
-      encrypted: newDest.encrypted || false
+      encrypted: newDest.encrypted || false,
+      encryption_password: newDest.encryption_password || ''
     }
   } else {
     formData.value = {
@@ -273,7 +296,8 @@ watch(() => props.destination, (newDest) => {
       s3_path: '',
       target_server_id: '',
       enabled: true,
-      encrypted: false
+      encrypted: false,
+      encryption_password: ''
     }
   }
 }, { immediate: true })
@@ -295,6 +319,11 @@ const handleSubmit = async () => {
   try {
     const data = { ...formData.value }
 
+    // 修复：删除时间字段（避免后端解析错误）
+    delete data.created_at
+    delete data.updated_at
+    delete data.id
+
     // 调试日志
     console.log('提交数据:', data)
     console.log('目标服务器ID:', data.target_server_id)
@@ -310,6 +339,14 @@ const handleSubmit = async () => {
     } else {
       // 确保 target_server_id 是数字类型
       data.target_server_id = Number(data.target_server_id)
+    }
+
+    // 设置默认存储路径
+    if (data.type === 'webdav' && (!data.webdav_path || data.webdav_path.trim() === '')) {
+      data.webdav_path = '/bitwarden-backup'
+    }
+    if (data.type === 's3' && (!data.s3_path || data.s3_path.trim() === '')) {
+      data.s3_path = '/bitwarden-backup'
     }
 
     if (props.destination?.id) {
