@@ -1,6 +1,7 @@
 package database
 
-// ServerConfigResponse 服务器配置响应（隐藏敏感信息）
+import "github.com/mingzaily/bitwarden-backup/internal/model"
+
 type ServerConfigResponse struct {
 	ID             uint   `json:"id"`
 	Name           string `json:"name"`
@@ -14,8 +15,7 @@ type ServerConfigResponse struct {
 	UpdatedAt      string `json:"updated_at"`
 }
 
-// ToResponse 转换为响应格式（隐藏敏感信息）
-func (s *ServerConfig) ToResponse() ServerConfigResponse {
+func ServerConfigToResponse(s *model.ServerConfig) ServerConfigResponse {
 	return ServerConfigResponse{
 		ID:             s.ID,
 		Name:           s.Name,
@@ -30,30 +30,27 @@ func (s *ServerConfig) ToResponse() ServerConfigResponse {
 	}
 }
 
-// BackupDestinationResponse 备份目标响应（隐藏敏感信息）
 type BackupDestinationResponse struct {
-	ID             uint   `json:"id"`
-	Name           string `json:"name"`
-	Type           string `json:"type"`
-	TypeLabel      string `json:"type_label"`
-	DisplayPath    string `json:"display_path"`
-	LocalPath      string `json:"local_path"`
-	WebDAVURL      string `json:"webdav_url"`
-	WebDAVUsername string `json:"webdav_username"`
-	WebDAVPassword string `json:"webdav_password"`
+	ID                 uint   `json:"id"`
+	Name               string `json:"name"`
+	Type               string `json:"type"`
+	TypeLabel          string `json:"type_label"`
+	DisplayPath        string `json:"display_path"`
+	LocalPath          string `json:"local_path"`
+	WebDAVURL          string `json:"webdav_url"`
+	WebDAVUsername     string `json:"webdav_username"`
+	WebDAVPassword     string `json:"webdav_password"`
 	WebDAVPath         string `json:"webdav_path"`
 	TargetServerID     *uint  `json:"target_server_id"`
 	Encrypted          bool   `json:"encrypted"`
 	EncryptionPassword string `json:"encryption_password"`
 	Enabled            bool   `json:"enabled"`
-	CreatedAt      string `json:"created_at"`
-	UpdatedAt      string `json:"updated_at"`
+	CreatedAt          string `json:"created_at"`
+	UpdatedAt          string `json:"updated_at"`
 }
 
-// ToResponse 转换为响应格式（隐藏敏感信息）
-func (d *BackupDestination) ToResponse() BackupDestinationResponse {
-	// 生成类型标签和展示路径
-	typeLabel, displayPath := d.getTypeInfo()
+func BackupDestinationToResponse(d *model.BackupDestination) BackupDestinationResponse {
+	typeLabel, displayPath := getDestinationTypeInfo(d)
 
 	return BackupDestinationResponse{
 		ID:                 d.ID,
@@ -75,7 +72,6 @@ func (d *BackupDestination) ToResponse() BackupDestinationResponse {
 	}
 }
 
-// maskSensitive 隐藏敏感信息，只显示前后几个字符
 func maskSensitive(s string) string {
 	if s == "" {
 		return ""
@@ -86,8 +82,7 @@ func maskSensitive(s string) string {
 	return s[:4] + "****" + s[len(s)-4:]
 }
 
-// getTypeInfo 获取类型标签和展示路径
-func (d *BackupDestination) getTypeInfo() (string, string) {
+func getDestinationTypeInfo(d *model.BackupDestination) (string, string) {
 	switch d.Type {
 	case "local":
 		return "本地存储", d.LocalPath

@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/mingzaily/bitwarden-backup/internal/database"
+	"github.com/mingzaily/bitwarden-backup/internal/model"
 )
 
-// AddTask 添加任务到调度器
-func (s *Scheduler) AddTask(task database.BackupTask) error {
+func (s *Scheduler) AddTask(task model.BackupTask) error {
 	_, err := s.cron.AddFunc(task.CronExpression, func() {
 		s.executeTask(task)
 	})
@@ -20,19 +20,17 @@ func (s *Scheduler) AddTask(task database.BackupTask) error {
 	return nil
 }
 
-// executeTask 执行备份任务
-func (s *Scheduler) executeTask(task database.BackupTask) {
+func (s *Scheduler) executeTask(task model.BackupTask) {
 	log.Printf("Executing task: %s", task.Name)
 
 	startTime := time.Now()
-	backupLog := database.BackupLog{
+	backupLog := model.BackupLog{
 		TaskID:    task.ID,
 		Status:    "running",
 		StartTime: startTime,
 	}
 	database.DB.Create(&backupLog)
 
-	// 执行备份
 	if err := s.performBackup(task, &backupLog); err != nil {
 		log.Printf("Task %s failed: %v", task.Name, err)
 		endTime := time.Now()

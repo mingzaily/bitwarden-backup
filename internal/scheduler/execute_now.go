@@ -5,21 +5,20 @@ import (
 	"time"
 
 	"github.com/mingzaily/bitwarden-backup/internal/database"
+	"github.com/mingzaily/bitwarden-backup/internal/model"
 )
 
-// ExecuteTaskNow 立即执行任务
-func (s *Scheduler) ExecuteTaskNow(task database.BackupTask) {
+func (s *Scheduler) ExecuteTaskNow(task model.BackupTask) {
 	log.Printf("Manually executing task: %s", task.Name)
 
 	startTime := time.Now()
-	backupLog := database.BackupLog{
+	backupLog := model.BackupLog{
 		TaskID:    task.ID,
 		Status:    "running",
 		StartTime: startTime,
 	}
 	database.DB.Create(&backupLog)
 
-	// 执行备份
 	if err := s.performBackup(task, &backupLog); err != nil {
 		log.Printf("Task %s failed: %v", task.Name, err)
 		endTime := time.Now()

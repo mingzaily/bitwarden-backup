@@ -5,6 +5,7 @@ import (
 
 	"github.com/mingzaily/bitwarden-backup/internal/config"
 	"github.com/mingzaily/bitwarden-backup/internal/database"
+	"github.com/mingzaily/bitwarden-backup/internal/handler"
 	"github.com/mingzaily/bitwarden-backup/internal/scheduler"
 )
 
@@ -16,6 +17,9 @@ func main() {
 	if err := database.Init(cfg.DBPath, cfg); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
+
+	// 初始化 Handler 层
+	handler.Init(database.DB)
 
 	// 初始化调度器
 	sched := scheduler.New()

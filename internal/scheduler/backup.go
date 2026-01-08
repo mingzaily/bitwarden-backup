@@ -1,11 +1,9 @@
 package scheduler
 
 import (
-	"github.com/mingzaily/bitwarden-backup/internal/database"
+	"github.com/mingzaily/bitwarden-backup/internal/model"
 )
 
-// performBackup 执行实际的备份操作
-func (s *Scheduler) performBackup(task database.BackupTask, backupLog *database.BackupLog) error {
-	// 使用新的多目标备份逻辑
+func (s *Scheduler) performBackup(task model.BackupTask, backupLog *model.BackupLog) error {
 	return s.performBackupToDestinations(task, backupLog)
 }

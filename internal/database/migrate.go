@@ -6,20 +6,17 @@ import (
 	"log"
 
 	"github.com/mingzaily/bitwarden-backup/internal/crypto"
+	"github.com/mingzaily/bitwarden-backup/internal/model"
 	"gorm.io/gorm"
 )
 
-// MigrateEncryptExistingData 迁移现有数据，加密敏感字段
-// 此函数应该在首次启用加密时运行一次
 func MigrateEncryptExistingData() error {
 	log.Println("Starting migration: encrypting existing sensitive data...")
 
-	// 迁移 ServerConfig 数据
 	if err := migrateServerConfigs(); err != nil {
 		return fmt.Errorf("failed to migrate server configs: %w", err)
 	}
 
-	// 迁移 BackupDestination 数据
 	if err := migrateBackupDestinations(); err != nil {
 		return fmt.Errorf("failed to migrate backup destinations: %w", err)
 	}
@@ -28,11 +25,9 @@ func MigrateEncryptExistingData() error {
 	return nil
 }
 
-// migrateServerConfigs 迁移服务器配置数据
 func migrateServerConfigs() error {
-	var servers []ServerConfig
+	var servers []model.ServerConfig
 
-	// 直接从数据库读取，跳过 AfterFind 钩子
 	if err := DB.Session(&gorm.Session{SkipHooks: true}).Find(&servers).Error; err != nil {
 		return err
 	}
@@ -43,7 +38,6 @@ func migrateServerConfigs() error {
 		server := &servers[i]
 		needsUpdate := false
 
-		// 检查是否已加密（加密后的数据是 base64 编码，长度会更长）
 		if server.ClientID != "" && !isEncrypted(server.ClientID) {
 			encrypted, err := crypto.Encrypt(server.ClientID)
 			if err != nil {
@@ -72,7 +66,6 @@ func migrateServerConfigs() error {
 		}
 
 		if needsUpdate {
-			// 跳过 BeforeSave 钩子，直接保存已加密的数据
 			if err := DB.Session(&gorm.Session{SkipHooks: true}).Save(server).Error; err != nil {
 				return fmt.Errorf("failed to save server %d: %w", server.ID, err)
 			}
@@ -83,11 +76,9 @@ func migrateServerConfigs() error {
 	return nil
 }
 
-// migrateBackupDestinations 迁移备份目标数据
 func migrateBackupDestinations() error {
-	var destinations []BackupDestination
+	var destinations []model.BackupDestination
 
-	// 直接从数据库读取，跳过 AfterFind 钩子
 	if err := DB.Session(&gorm.Session{SkipHooks: true}).Find(&destinations).Error; err != nil {
 		return err
 	}
@@ -98,7 +89,6 @@ func migrateBackupDestinations() error {
 		dest := &destinations[i]
 		needsUpdate := false
 
-		// 检查 WebDAV 密码是否需要加密
 		if dest.WebDAVPassword != "" && !isEncrypted(dest.WebDAVPassword) {
 			encrypted, err := crypto.Encrypt(dest.WebDAVPassword)
 			if err != nil {
@@ -109,7 +99,6 @@ func migrateBackupDestinations() error {
 		}
 
 		if needsUpdate {
-			// 跳过 BeforeSave 钩子，直接保存已加密的数据
 			if err := DB.Session(&gorm.Session{SkipHooks: true}).Save(dest).Error; err != nil {
 				return fmt.Errorf("failed to save destination %d: %w", dest.ID, err)
 			}
@@ -120,9 +109,7 @@ func migrateBackupDestinations() error {
 	return nil
 }
 
-// isEncrypted 检查字符串是否已经加密（简单检查是否为有效的 base64）
 func isEncrypted(s string) bool {
-	// 加密后的数据是 base64 编码，尝试解码
 	_, err := base64.StdEncoding.DecodeString(s)
-	return err == nil && len(s) > 50 // 加密后的数据通常较长
+	return err == nil && len(s) > 50
 }

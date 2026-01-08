@@ -5,12 +5,11 @@ import (
 	"log"
 
 	"github.com/mingzaily/bitwarden-backup/internal/database"
+	"github.com/mingzaily/bitwarden-backup/internal/model"
 )
 
-// LoadTasks 从数据库加载所有启用的任务
 func (s *Scheduler) LoadTasks() error {
-	var tasks []database.BackupTask
-	// 预加载关联的备份目标
+	var tasks []model.BackupTask
 	if err := database.DB.Preload("Destinations").Where("enabled = ?", true).Find(&tasks).Error; err != nil {
 		return fmt.Errorf("failed to load tasks: %w", err)
 	}
@@ -19,7 +18,6 @@ func (s *Scheduler) LoadTasks() error {
 	manualCount := 0
 
 	for _, task := range tasks {
-		// 跳过没有 Cron 表达式的任务（手动触发任务）
 		if task.CronExpression == "" {
 			log.Printf("Skipping manual task: %s (no cron expression)", task.Name)
 			manualCount++

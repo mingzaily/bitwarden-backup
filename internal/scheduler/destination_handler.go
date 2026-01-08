@@ -3,11 +3,10 @@ package scheduler
 import (
 	"fmt"
 
-	"github.com/mingzaily/bitwarden-backup/internal/database"
+	"github.com/mingzaily/bitwarden-backup/internal/model"
 )
 
-// backupToDestination 备份到单个目标
-func (s *Scheduler) backupToDestination(dest database.BackupDestination, sourceFile, taskName, timestamp string) error {
+func (s *Scheduler) backupToDestination(dest model.BackupDestination, sourceFile, taskName, timestamp string) error {
 	switch dest.Type {
 	case "local":
 		return s.backupToLocal(dest, sourceFile, taskName, timestamp)

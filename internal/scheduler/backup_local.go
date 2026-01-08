@@ -6,20 +6,16 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mingzaily/bitwarden-backup/internal/database"
+	"github.com/mingzaily/bitwarden-backup/internal/model"
 )
 
-// backupToLocal 备份到本地存储
-func (s *Scheduler) backupToLocal(dest database.BackupDestination, sourceFile, taskName, timestamp string) error {
-	// 确保目标目录存在
+func (s *Scheduler) backupToLocal(dest model.BackupDestination, sourceFile, taskName, timestamp string) error {
 	if err := os.MkdirAll(dest.LocalPath, 0755); err != nil {
 		return fmt.Errorf("failed to create local directory: %w", err)
 	}
 
-	// 生成目标文件名
 	targetFile := filepath.Join(dest.LocalPath, fmt.Sprintf("backup_%s_%s.json", taskName, timestamp))
 
-	// 复制文件
 	source, err := os.Open(sourceFile)
 	if err != nil {
 		return fmt.Errorf("failed to open source file: %w", err)

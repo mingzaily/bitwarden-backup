@@ -9,11 +9,10 @@ import (
 
 	"github.com/mingzaily/bitwarden-backup/internal/bitwarden"
 	"github.com/mingzaily/bitwarden-backup/internal/database"
+	"github.com/mingzaily/bitwarden-backup/internal/model"
 )
 
-// getTempDir 获取临时目录，优先使用工作目录下的 .tmp
 func getTempDir() string {
-	// 尝试使用当前工作目录下的 .tmp 目录
 	cwd, err := os.Getwd()
 	if err == nil {
 		tmpDir := filepath.Join(cwd, ".tmp")
@@ -21,23 +20,16 @@ func getTempDir() string {
 			return tmpDir
 		}
 	}
-	// 回退到系统临时目录
 	return os.TempDir()
 }
 
-// performBackupToDestinations 执行备份到多个目标
-func (s *Scheduler) performBackupToDestinations(task database.BackupTask, backupLog *database.BackupLog) error {
-	// 获取源服务器配置
-	var sourceServer database.ServerConfig
+func (s *Scheduler) performBackupToDestinations(task model.BackupTask, backupLog *model.BackupLog) error {
+	var sourceServer model.ServerConfig
 	if err := database.DB.First(&sourceServer, task.SourceServerID).Error; err != nil {
 		return fmt.Errorf("failed to get source server: %w", err)
 	}
 
-	// 创建 Bitwarden 客户端并导出数据
 	client := bitwarden.NewClient()
-	
-	// 确保之前的会话已清除，防止 "Logout required before server config update" 错误
-	// 忽略登出错误（可能并未登录）
 	_ = client.Logout()
 
 	if err := client.ConfigServer(sourceServer.ServerURL); err != nil {
@@ -52,11 +44,9 @@ func (s *Scheduler) performBackupToDestinations(task database.BackupTask, backup
 		return fmt.Errorf("failed to unlock: %w", err)
 	}
 
-	// 生成临时备份文件
 	timestamp := time.Now().Format("20060102_150405")
 	var tempFiles []string
 
-	// 检查是否需要加密和非加密两种格式，并收集加密密码
 	needEncrypted := false
 	needPlain := false
 	var encryptionPassword string
@@ -67,7 +57,6 @@ func (s *Scheduler) performBackupToDestinations(task database.BackupTask, backup
 		if dest.Type == "local" || dest.Type == "webdav" || dest.Type == "s3" {
 			if dest.Encrypted {
 				needEncrypted = true
-				// 使用第一个启用加密的目标的密码
 				if encryptionPassword == "" && dest.EncryptionPassword != "" {
 					encryptionPassword = dest.EncryptionPassword
 				}
@@ -79,12 +68,10 @@ func (s *Scheduler) performBackupToDestinations(task database.BackupTask, backup
 		}
 	}
 
-	// 验证加密密码
 	if needEncrypted && encryptionPassword == "" {
 		return fmt.Errorf("encryption password is required for encrypted backup destinations")
 	}
 
-	// 导出非加密版本
 	var plainFile string
 	if needPlain {
 		plainFile = filepath.Join(getTempDir(), fmt.Sprintf("backup_%s_%s.json", task.Name, timestamp))
@@ -95,7 +82,6 @@ func (s *Scheduler) performBackupToDestinations(task database.BackupTask, backup
 		tempFiles = append(tempFiles, plainFile)
 	}
 
-	// 导出加密版本
 	var encryptedFile string
 	if needEncrypted {
 		encryptedFile = filepath.Join(getTempDir(), fmt.Sprintf("backup_%s_%s_encrypted.json", task.Name, timestamp))
@@ -111,7 +97,6 @@ func (s *Scheduler) performBackupToDestinations(task database.BackupTask, backup
 		backupLog.BackupFile = encryptedFile
 	}
 
-	// 备份到所有目标
 	for _, dest := range task.Destinations {
 		if !dest.Enabled {
 			continue
@@ -127,7 +112,6 @@ func (s *Scheduler) performBackupToDestinations(task database.BackupTask, backup
 		}
 	}
 
-	// 清理临时文件
 	for _, f := range tempFiles {
 		if err := os.Remove(f); err != nil {
 			log.Printf("Failed to remove temp file %s: %v", f, err)
