@@ -32,12 +32,23 @@
 ```bash
 mkdir bitwarden-backup && cd bitwarden-backup
 curl -O https://raw.githubusercontent.com/mingzaily/bitwarden-backup/master/docker-compose.yml
+```
+
+编辑 `docker-compose.yml`，配置加密密钥：
+
+```yaml
+environment:
+  - BITWARDEN_BACKUP_MASTER_KEY=your-secret-key-here  # 建议使用随机字符串
+  - TZ=Asia/Shanghai
+```
+
+启动服务：
+
+```bash
 docker compose up -d
 ```
 
 访问 `http://localhost:8080` 进入管理界面。
-
-> 加密密钥会自动生成并保存在 `./data/.env`，容器重建后仍然有效。
 
 ### 方式二：Docker Run
 
@@ -45,6 +56,8 @@ docker compose up -d
 docker run -d \
   --name bitwarden-backup \
   -p 8080:8080 \
+  -e BITWARDEN_BACKUP_MASTER_KEY=your-secret-key-here \
+  -e TZ=Asia/Shanghai \
   -v ./data:/app/data \
   -v ./backups:/app/backups \
   mingzaily/bitwarden-backup:latest
@@ -81,14 +94,11 @@ go build -o bitwarden-backup ./cmd/server
 
 ### 加密密钥管理
 
-密钥加载优先级：
-1. 环境变量 `BITWARDEN_BACKUP_MASTER_KEY`
-2. `data/.env` 文件（Docker 持久化目录）
-3. `.env` 文件（本地开发）
-4. 自动生成并保存到 `data/.env`
+**推荐**：通过环境变量 `BITWARDEN_BACKUP_MASTER_KEY` 配置密钥。
 
-> **提示**：使用 Docker Compose 时，密钥自动保存在 `./data/.env`，容器重建后仍然有效。
-> 建议定期备份 `data/` 目录。
+如未配置，系统会自动生成并保存到 `data/.env`。
+
+> **提示**：建议定期备份 `data/` 目录，其中包含数据库和密钥文件。
 
 ## 使用指南
 
