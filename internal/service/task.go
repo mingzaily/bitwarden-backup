@@ -29,9 +29,18 @@ func (s *TaskService) Create(task *model.BackupTask) error {
 	return s.repo.Create(task)
 }
 
+func (s *TaskService) CreateWithDestinations(task *model.BackupTask, destinationIDs []uint) error {
+	return s.repo.CreateWithDestinations(task, destinationIDs)
+}
+
 func (s *TaskService) Update(id uint, task *model.BackupTask) error {
 	task.ID = id
 	return s.repo.Update(task)
+}
+
+func (s *TaskService) UpdateWithDestinations(id uint, task *model.BackupTask, destinationIDs []uint) error {
+	task.ID = id
+	return s.repo.UpdateWithDestinations(task, destinationIDs)
 }
 
 func (s *TaskService) Delete(id uint) error {

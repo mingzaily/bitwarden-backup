@@ -68,6 +68,13 @@
                 </svg>
                 <span class="text-gray-700 font-bold break-all leading-4">ID: {{ server.client_id || 'N/A' }}</span>
               </div>
+              <!-- 创建时间 -->
+              <div class="flex items-center text-sm">
+                <svg class="flex-shrink-0 mr-2 h-4 w-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span class="text-gray-600 font-bold leading-4">创建于 {{ formatDateTime(server.created_at) }}</span>
+              </div>
             </div>
 
             <!-- 右侧：操作按钮 -->
@@ -122,6 +129,13 @@ const servers = ref([])
 const loading = ref(false)
 const showModal = ref(false)
 const editingServer = ref(null)
+
+const formatDateTime = (dateStr) => {
+  if (!dateStr) return 'N/A'
+  const date = new Date(dateStr)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
 
 const loadServers = async () => {
   loading.value = true

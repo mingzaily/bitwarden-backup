@@ -16,3 +16,7 @@ func NewLogService(repo *repository.LogRepository) *LogService {
 func (s *LogService) GetAll() ([]model.BackupLog, error) {
 	return s.repo.FindAll()
 }
+
+func (s *LogService) GetByTaskID(taskID uint) ([]model.BackupLog, error) {
+	return s.repo.FindByTaskID(taskID)
+}

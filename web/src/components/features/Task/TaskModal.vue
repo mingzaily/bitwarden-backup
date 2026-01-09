@@ -97,13 +97,15 @@ const getTypeLabel = (type) => {
 
 watch(() => props.task, (newTask) => {
   if (newTask) {
-    console.log('TaskModal: Loading task', newTask)
     const destinationIds = newTask.destinations?.map(d => d.id) || []
-    console.log('TaskModal: Extracted destination IDs', destinationIds)
+    const sourceServerId = newTask.source_server?.id || newTask.source_server_id || ''
 
     formData.value = {
-      ...newTask,
-      destination_ids: destinationIds
+      name: newTask.name || '',
+      cron_expression: newTask.cron_expression || '',
+      source_server_id: sourceServerId,
+      destination_ids: destinationIds,
+      enabled: newTask.enabled ?? true
     }
   } else {
     formData.value = {
@@ -158,7 +160,7 @@ const handleSubmit = async () => {
     emit('saved')
   } catch (error) {
     console.error('Failed to save task:', error)
-    toast.error('保存失败')
+    toast.error(error.message || '保存失败')
   } finally {
     loading.value = false
   }

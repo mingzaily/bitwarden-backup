@@ -31,32 +31,47 @@ func InitEncryption() error {
 	// 1. 首先检查环境变量
 	masterKey := os.Getenv("BITWARDEN_BACKUP_MASTER_KEY")
 	if masterKey != "" {
-		log.Println("[Encryption] Master key loaded from environment variable")
+		log.Println("[encryption] Master key loaded from environment variable")
 		return deriveEncryptionKey(masterKey)
 	}
 
-	// 2. 尝试从 .env 文件加载
-	envPath := ".env"
-	masterKey, err := loadKeyFromEnvFile(envPath)
+	// 2. 尝试从 data/.env 文件加载（Docker 持久化目录）
+	dataEnvPath := "data/.env"
+	masterKey, err := loadKeyFromEnvFile(dataEnvPath)
 	if err == nil && masterKey != "" {
-		log.Printf("[Encryption] Master key loaded from %s file", envPath)
+		log.Printf("[encryption] Master key loaded from %s file", dataEnvPath)
 		return deriveEncryptionKey(masterKey)
 	}
 
-	// 如果是文件不存在以外的错误，返回错误（避免覆盖损坏的文件）
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to load key from .env file: %w", err)
+	// 3. 尝试从 .env 文件加载（本地开发兼容）
+	envPath := ".env"
+	masterKey, err = loadKeyFromEnvFile(envPath)
+	if err == nil && masterKey != "" {
+		log.Printf("[encryption] Master key loaded from %s file", envPath)
+		return deriveEncryptionKey(masterKey)
 	}
 
-	// 3. 生成新密钥并保存到 .env 文件（仅当文件不存在时）
-	log.Println("[Encryption] No master key found, generating new key...")
+	// 4. 生成新密钥并保存到 data/.env（优先）或 .env
+	log.Println("[encryption] No master key found, generating new key...")
+
+	// 确保 data 目录存在
+	if err := os.MkdirAll("data", 0755); err == nil {
+		masterKey, err = generateAndSaveKey(dataEnvPath)
+		if err == nil {
+			log.Printf("[encryption] New master key generated and saved to %s", dataEnvPath)
+			log.Println("[encryption] Key is persisted in data/ directory")
+			return deriveEncryptionKey(masterKey)
+		}
+	}
+
+	// 回退到 .env
 	masterKey, err = generateAndSaveKey(envPath)
 	if err != nil {
 		return fmt.Errorf("failed to generate and save master key: %w", err)
 	}
 
-	log.Printf("[Encryption] New master key generated and saved to %s", envPath)
-	log.Println("[Encryption] ⚠️  IMPORTANT: Backup this .env file! Losing it means permanent data loss.")
+	log.Printf("[encryption] New master key generated and saved to %s", envPath)
+	log.Println("[encryption] ⚠️  IMPORTANT: Backup this .env file!")
 
 	return deriveEncryptionKey(masterKey)
 }

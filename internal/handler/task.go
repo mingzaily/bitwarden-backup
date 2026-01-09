@@ -1,12 +1,28 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mingzaily/bitwarden-backup/internal/model"
 )
+
+// validateSourceDestination 校验源和目标不能相同
+func validateSourceDestination(sourceServerID uint, destinationIDs []uint) error {
+	for _, destID := range destinationIDs {
+		dest, err := destinationSvc.GetByID(destID)
+		if err != nil {
+			continue
+		}
+		// 如果目标类型是服务器，且目标服务器ID等于源服务器ID
+		if dest.Type == "server" && dest.TargetServerID != nil && *dest.TargetServerID == sourceServerID {
+			return errors.New("备份目标不能与源服务器相同")
+		}
+	}
+	return nil
+}
 
 // GetTasks 获取所有任务
 func GetTasks(c *gin.Context) {
@@ -15,7 +31,12 @@ func GetTasks(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, tasks)
+	// 转换为响应结构，隐藏敏感字段
+	responses := make([]model.TaskResponse, len(tasks))
+	for i, t := range tasks {
+		responses[i] = t.ToResponse()
+	}
+	c.JSON(http.StatusOK, responses)
 }
 
 // GetTask 获取单个任务
@@ -30,21 +51,38 @@ func GetTask(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
-	c.JSON(http.StatusOK, task)
+	c.JSON(http.StatusOK, task.ToResponse())
 }
 
 // CreateTask 创建任务
 func CreateTask(c *gin.Context) {
-	var task model.BackupTask
-	if err := c.ShouldBindJSON(&task); err != nil {
+	var req model.TaskRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := taskSvc.Create(&task); err != nil {
+
+	// 校验源和目标不能相同
+	if err := validateSourceDestination(req.SourceServerID, req.DestinationIDs); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	task := &model.BackupTask{
+		Name:           req.Name,
+		SourceServerID: req.SourceServerID,
+		CronExpression: req.CronExpression,
+		Enabled:        true,
+	}
+
+	if err := taskSvc.CreateWithDestinations(task, req.DestinationIDs); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusCreated, task)
+
+	// 返回创建后的完整任务
+	createdTask, _ := taskSvc.GetByID(task.ID)
+	c.JSON(http.StatusCreated, createdTask.ToResponse())
 }
 
 // UpdateTask 更新任务
@@ -54,16 +92,37 @@ func UpdateTask(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 		return
 	}
-	var task model.BackupTask
-	if err := c.ShouldBindJSON(&task); err != nil {
+
+	var req model.TaskRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := taskSvc.Update(uint(id), &task); err != nil {
+
+	// 校验源和目标不能相同
+	if err := validateSourceDestination(req.SourceServerID, req.DestinationIDs); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	task := &model.BackupTask{
+		Name:           req.Name,
+		SourceServerID: req.SourceServerID,
+		CronExpression: req.CronExpression,
+	}
+
+	if req.Enabled != nil {
+		task.Enabled = *req.Enabled
+	}
+
+	if err := taskSvc.UpdateWithDestinations(uint(id), task, req.DestinationIDs); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, task)
+
+	// 返回更新后的完整任务
+	updatedTask, _ := taskSvc.GetByID(uint(id))
+	c.JSON(http.StatusOK, updatedTask.ToResponse())
 }
 
 // DeleteTask 删除任务

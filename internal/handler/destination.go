@@ -15,7 +15,12 @@ func GetDestinations(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, dests)
+	// 转换为响应结构，隐藏敏感字段
+	responses := make([]model.DestinationResponse, len(dests))
+	for i, d := range dests {
+		responses[i] = d.ToResponse()
+	}
+	c.JSON(http.StatusOK, responses)
 }
 
 // GetDestination 获取单个备份目标
@@ -30,7 +35,7 @@ func GetDestination(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Destination not found"})
 		return
 	}
-	c.JSON(http.StatusOK, dest)
+	c.JSON(http.StatusOK, dest.ToResponse())
 }
 
 // CreateDestination 创建备份目标
@@ -44,7 +49,9 @@ func CreateDestination(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusCreated, dest)
+	// 重新获取以确保数据完整
+	created, _ := destinationSvc.GetByID(dest.ID)
+	c.JSON(http.StatusCreated, created.ToResponse())
 }
 
 // UpdateDestination 更新备份目标
@@ -54,16 +61,54 @@ func UpdateDestination(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 		return
 	}
-	var dest model.BackupDestination
-	if err := c.ShouldBindJSON(&dest); err != nil {
+
+	var req model.BackupDestination
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := destinationSvc.Update(uint(id), &dest); err != nil {
+
+	// 获取现有记录
+	existing, err := destinationSvc.GetByID(uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Destination not found"})
+		return
+	}
+
+	// 更新非敏感字段
+	existing.Name = req.Name
+	existing.Type = req.Type
+	existing.LocalPath = req.LocalPath
+	existing.WebDAVURL = req.WebDAVURL
+	existing.WebDAVUsername = req.WebDAVUsername
+	existing.WebDAVPath = req.WebDAVPath
+	existing.S3Endpoint = req.S3Endpoint
+	existing.S3Region = req.S3Region
+	existing.S3Bucket = req.S3Bucket
+	existing.S3AccessKey = req.S3AccessKey
+	existing.S3Path = req.S3Path
+	existing.TargetServerID = req.TargetServerID
+	existing.Encrypted = req.Encrypted
+
+	// 敏感字段：空值不更新
+	if req.WebDAVPassword != "" {
+		existing.WebDAVPassword = req.WebDAVPassword
+	}
+	if req.S3SecretKey != "" {
+		existing.S3SecretKey = req.S3SecretKey
+	}
+	if req.EncryptionPassword != "" {
+		existing.EncryptionPassword = req.EncryptionPassword
+	}
+
+	if err := destinationSvc.Update(uint(id), existing); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, dest)
+
+	// 重新获取更新后的数据
+	updated, _ := destinationSvc.GetByID(uint(id))
+	c.JSON(http.StatusOK, updated.ToResponse())
 }
 
 // DeleteDestination 删除备份目标

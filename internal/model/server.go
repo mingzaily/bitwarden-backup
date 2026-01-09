@@ -72,3 +72,40 @@ func (s *ServerConfig) AfterFind(tx *gorm.DB) error {
 	}
 	return nil
 }
+
+// ToResponse 转换为响应结构（隐藏敏感字段）
+func (s *ServerConfig) ToResponse() ServerResponse {
+	return ServerResponse{
+		ID:         s.ID,
+		Name:       s.Name,
+		ServerURL:  s.ServerURL,
+		ClientID:   s.ClientID,
+		IsOfficial: s.IsOfficial,
+		Enabled:    s.Enabled,
+		CreatedAt:  s.CreatedAt,
+		UpdatedAt:  s.UpdatedAt,
+	}
+}
+
+// ServerResponse 服务器响应结构（隐藏敏感字段）
+type ServerResponse struct {
+	ID         uint      `json:"id"`
+	Name       string    `json:"name"`
+	ServerURL  string    `json:"server_url"`
+	ClientID   string    `json:"client_id"`
+	IsOfficial bool      `json:"is_official"`
+	Enabled    bool      `json:"enabled"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+// ServerRequest 服务器请求 DTO
+type ServerRequest struct {
+	Name           string `json:"name"`
+	ServerURL      string `json:"server_url"`
+	ClientID       string `json:"client_id"`
+	ClientSecret   string `json:"client_secret"`
+	MasterPassword string `json:"master_password"`
+	IsOfficial     bool   `json:"is_official"`
+	Enabled        *bool  `json:"enabled"`
+}

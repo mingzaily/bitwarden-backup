@@ -1,20 +1,24 @@
 package scheduler
 
 import (
-	"fmt"
-
 	"github.com/mingzaily/bitwarden-backup/internal/model"
+	"github.com/mingzaily/bitwarden-backup/internal/provider"
 )
 
 func (s *Scheduler) backupToDestination(dest model.BackupDestination, sourceFile, taskName, timestamp string) error {
-	switch dest.Type {
-	case "local":
-		return s.backupToLocal(dest, sourceFile, taskName, timestamp)
-	case "webdav":
-		return s.backupToWebDAV(dest, sourceFile, taskName, timestamp)
-	case "server":
-		return s.backupToServer(dest, sourceFile)
-	default:
-		return fmt.Errorf("unknown destination type: %s", dest.Type)
+	registry := provider.GetRegistry()
+
+	p, err := registry.Get(dest.Type)
+	if err != nil {
+		return err
 	}
+
+	ctx := provider.BackupContext{
+		SourceFile:  sourceFile,
+		TaskName:    taskName,
+		Timestamp:   timestamp,
+		Destination: dest,
+	}
+
+	return p.Backup(ctx)
 }

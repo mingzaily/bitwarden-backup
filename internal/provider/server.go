@@ -1,4 +1,4 @@
-package scheduler
+package provider
 
 import (
 	"fmt"
@@ -8,7 +8,23 @@ import (
 	"github.com/mingzaily/bitwarden-backup/internal/model"
 )
 
-func (s *Scheduler) backupToServer(dest model.BackupDestination, sourceFile string) error {
+// ServerProvider 服务器备份提供者
+type ServerProvider struct{}
+
+// NewServerProvider 创建服务器备份提供者
+func NewServerProvider() *ServerProvider {
+	return &ServerProvider{}
+}
+
+// Type 返回提供者类型
+func (p *ServerProvider) Type() string {
+	return "server"
+}
+
+// Backup 执行服务器备份（导入到目标服务器）
+func (p *ServerProvider) Backup(ctx BackupContext) error {
+	dest := ctx.Destination
+
 	if dest.TargetServerID == nil {
 		return fmt.Errorf("target server id is nil")
 	}
@@ -31,7 +47,7 @@ func (s *Scheduler) backupToServer(dest model.BackupDestination, sourceFile stri
 		return fmt.Errorf("failed to unlock target: %w", err)
 	}
 
-	if err := client.Import(sourceFile, "json"); err != nil {
+	if err := client.Import(ctx.SourceFile, "json"); err != nil {
 		client.Logout()
 		return fmt.Errorf("failed to import: %w", err)
 	}

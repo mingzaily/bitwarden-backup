@@ -3,7 +3,14 @@ const API_BASE = '/api'
 
 const handleResponse = async (response) => {
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`)
+    // 尝试解析后端返回的错误信息
+    try {
+      const data = await response.json()
+      throw new Error(data.error || `HTTP ${response.status}`)
+    } catch (e) {
+      if (e.message) throw e
+      throw new Error(`HTTP ${response.status}`)
+    }
   }
   return response.json()
 }
@@ -74,5 +81,10 @@ export const tasksApi = {
 
 // Logs API
 export const logsApi = {
-  getAll: () => fetch(`${API_BASE}/logs`).then(handleResponse)
+  getAll: (params = {}) => {
+    const query = new URLSearchParams()
+    if (params.task_id) query.append('task_id', params.task_id)
+    const queryString = query.toString() ? `?${query.toString()}` : ''
+    return fetch(`${API_BASE}/logs${queryString}`).then(handleResponse)
+  }
 }

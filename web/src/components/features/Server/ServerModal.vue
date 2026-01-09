@@ -79,10 +79,13 @@
           <input
             v-model="formData.client_secret"
             type="password"
-            required
+            :required="!server"
             class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
             placeholder="••••••••••••••••"
           />
+          <p v-if="server" class="mt-1 text-xs text-gray-600">
+            💡 留空表示不修改
+          </p>
         </div>
 
         <div>
@@ -95,12 +98,13 @@
           <input
             v-model="formData.master_password"
             type="password"
-            required
+            :required="!server"
             class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
             placeholder="••••••••••••••••"
           />
           <p class="mt-1 text-xs text-gray-600">
-            💡 为什么需要主密码？备份时需要使用 Bitwarden CLI 的 <code class="px-1 py-0.5 bg-gray-100 rounded text-xs">bw unlock</code> 命令解锁保险库，才能导出数据进行备份。
+            <template v-if="server">💡 留空表示不修改</template>
+            <template v-else>💡 备份时需要使用 Bitwarden CLI 解锁保险库</template>
           </p>
         </div>
 

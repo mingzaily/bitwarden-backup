@@ -36,8 +36,63 @@ func (r *TaskRepository) Create(task *model.BackupTask) error {
 	return r.db.Create(task).Error
 }
 
+func (r *TaskRepository) CreateWithDestinations(task *model.BackupTask, destinationIDs []uint) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// 创建任务
+		if err := tx.Create(task).Error; err != nil {
+			return err
+		}
+
+		// 添加目标关联
+		if len(destinationIDs) > 0 {
+			var destinations []model.BackupDestination
+			if err := tx.Where("id IN ?", destinationIDs).Find(&destinations).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(task).Association("Destinations").Replace(destinations); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
 func (r *TaskRepository) Update(task *model.BackupTask) error {
 	return r.db.Save(task).Error
+}
+
+func (r *TaskRepository) UpdateWithDestinations(task *model.BackupTask, destinationIDs []uint) error {
+	// 开启事务
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// 只更新指定字段，保留 created_at
+		if err := tx.Model(&model.BackupTask{}).Where("id = ?", task.ID).Updates(map[string]any{
+			"name":             task.Name,
+			"source_server_id": task.SourceServerID,
+			"cron_expression":  task.CronExpression,
+			"enabled":          task.Enabled,
+		}).Error; err != nil {
+			return err
+		}
+
+		// 清除旧的关联
+		if err := tx.Model(task).Association("Destinations").Clear(); err != nil {
+			return err
+		}
+
+		// 添加新的关联
+		if len(destinationIDs) > 0 {
+			var destinations []model.BackupDestination
+			if err := tx.Where("id IN ?", destinationIDs).Find(&destinations).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(task).Association("Destinations").Replace(destinations); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
 }
 
 func (r *TaskRepository) Delete(id uint) error {

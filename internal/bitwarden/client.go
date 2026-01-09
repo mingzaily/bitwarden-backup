@@ -81,7 +81,7 @@ func (c *Client) runBW(args []string, stdin string, extraEnv map[string]string) 
 		ExitCode: exitCode,
 	}
 
-	log.Printf("[bitwarden] exec: bw %s (exit=%d)", strings.Join(redactBWArgs(args), " "), exitCode)
+	log.Printf("[bitwarden] bw %s (exit=%d)", strings.Join(redactBWArgs(args), " "), exitCode)
 	return res, err
 }
 

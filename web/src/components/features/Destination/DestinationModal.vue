@@ -78,8 +78,12 @@
               <input
                 v-model="formData.webdav_password"
                 type="password"
+                :required="!destination"
                 class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
               />
+              <p v-if="destination" class="mt-1 text-xs text-gray-600">
+                💡 留空表示不修改
+              </p>
             </div>
           </div>
           <div>
@@ -143,8 +147,12 @@
               <input
                 v-model="formData.s3_secret_key"
                 type="password"
+                :required="!destination"
                 class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
               />
+              <p v-if="destination" class="mt-1 text-xs text-gray-600">
+                💡 留空表示不修改
+              </p>
             </div>
           </div>
           <div>
@@ -190,12 +198,13 @@
             <input
               v-model="formData.encryption_password"
               type="password"
-              required
+              :required="!destination"
               class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
               placeholder="请输入加密密码"
             />
             <p class="text-xs text-gray-600 mt-1">
-              💡 此密码用于加密导出的备份文件，解密时需要使用相同密码
+              <template v-if="destination">💡 留空表示不修改</template>
+              <template v-else>💡 此密码用于加密导出的备份文件，解密时需要使用相同密码</template>
             </p>
           </div>
         </div>

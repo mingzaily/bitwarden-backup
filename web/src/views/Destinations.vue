@@ -70,7 +70,7 @@
                 <svg class="flex-shrink-0 mr-2 h-4 w-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
-                <span class="text-gray-600 font-bold leading-4">创建于 {{ destination.created_at }}</span>
+                <span class="text-gray-600 font-bold leading-4">创建于 {{ formatDateTime(destination.created_at) }}</span>
               </div>
             </div>
 
@@ -124,6 +124,13 @@ const destinations = ref([])
 const loading = ref(false)
 const showModal = ref(false)
 const editingDestination = ref(null)
+
+const formatDateTime = (dateStr) => {
+  if (!dateStr) return 'N/A'
+  const date = new Date(dateStr)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
 
 const getTypeLabel = (type) => {
   const labels = {

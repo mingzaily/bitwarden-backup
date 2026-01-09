@@ -15,13 +15,13 @@ func NewDestinationRepository(db *gorm.DB) *DestinationRepository {
 
 func (r *DestinationRepository) FindAll() ([]model.BackupDestination, error) {
 	var dests []model.BackupDestination
-	err := r.db.Find(&dests).Error
+	err := r.db.Preload("TargetServer").Find(&dests).Error
 	return dests, err
 }
 
 func (r *DestinationRepository) FindByID(id uint) (*model.BackupDestination, error) {
 	var dest model.BackupDestination
-	err := r.db.First(&dest, id).Error
+	err := r.db.Preload("TargetServer").First(&dest, id).Error
 	return &dest, err
 }
 

@@ -33,73 +33,78 @@
           !task.enabled && 'opacity-50'
         ]"
       >
-        <div class="px-6 py-4 bg-brutalist-cream/20 min-h-[90px]">
-          <div class="flex items-center justify-between">
-            <!-- 左侧：任务信息 -->
-            <div class="flex-1 space-y-2">
-              <div class="flex items-center gap-2 mb-3">
-                <h3 class="text-base font-black text-gray-900 leading-6">{{ task.name }}</h3>
-                <!-- 任务类型标签 -->
+        <div class="px-6 py-4 bg-brutalist-cream/20">
+          <div class="flex flex-col xl:flex-row xl:items-center gap-4 xl:gap-6">
+            <!-- 左侧：任务信息与调度 -->
+            <div class="w-full xl:w-64 shrink-0 space-y-2">
+              <div class="flex items-center gap-2">
+                <h3 class="text-base font-black text-gray-900 leading-tight truncate" :title="task.name">{{ task.name }}</h3>
                 <span
                   :class="[
-                    'px-2 py-0.5 text-xs font-bold rounded border-2 border-black',
+                    'px-2 py-0.5 text-xs font-bold rounded border-2 border-black whitespace-nowrap',
                     task.cron_expression ? 'bg-brutalist-blue text-white' : 'bg-gray-300 text-gray-700'
                   ]"
                 >
                   {{ task.cron_expression ? '定时' : '手动' }}
                 </span>
               </div>
-
-              <!-- 备份流程 -->
-              <BackupFlow
-                :source-server="task.source_server"
-                :destinations="task.destinations"
-                class="mb-3"
-              />
-
               <div class="flex items-center text-sm">
-                <svg class="flex-shrink-0 mr-2 h-4 w-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
-                <span class="text-gray-700 font-bold leading-4">
-                  {{ task.cron_expression ? `Cron: ${task.cron_expression}` : '手动触发' }}
+                <span class="text-gray-600 font-bold leading-4">
+                  {{ task.cron_expression || '手动触发' }}
+                </span>
+              </div>
+              <div class="flex items-center text-sm">
+                <svg class="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                <span class="text-gray-600 font-bold leading-4">
+                  创建于 {{ formatDateTime(task.created_at) }}
                 </span>
               </div>
             </div>
 
+            <!-- 中间：备份流程 Visualization -->
+            <div class="flex-1 min-w-0 border-t-2 xl:border-t-0 xl:border-l-2 border-black/5 pt-4 xl:pt-0 xl:pl-6">
+              <BackupFlow
+                :source-server="task.source_server"
+                :destinations="task.destinations"
+              />
+            </div>
+
             <!-- 右侧：操作按钮 -->
-            <div class="ml-4 shrink-0">
-              <div class="inline-flex items-center overflow-hidden rounded border-2 border-black divide-x-2 divide-black">
-                <button
-                  @click="executeTask(task.id)"
-                  class="px-3 py-1 text-sm font-bold text-brutalist-green hover:bg-green-50 transition-colors whitespace-nowrap"
-                >
-                  立即执行
-                </button>
-                <button
-                  @click="toggleTask(task.id, !task.enabled)"
-                  :class="[
-                    'px-3 py-1 text-sm font-bold transition-colors whitespace-nowrap',
-                    task.enabled
-                      ? 'text-gray-700 hover:bg-gray-50'
-                      : 'text-brutalist-green hover:bg-green-50'
-                  ]"
-                >
-                  {{ task.enabled ? '禁用' : '启用' }}
-                </button>
-                <button
-                  @click="editTask(task)"
-                  class="px-3 py-1 text-sm font-bold text-brutalist-blue hover:bg-blue-50 transition-colors whitespace-nowrap"
-                >
-                  编辑
-                </button>
-                <button
-                  @click="deleteTask(task.id)"
-                  class="px-3 py-1 text-sm font-bold text-brutalist-red hover:bg-red-50 transition-colors whitespace-nowrap"
-                >
-                  删除
-                </button>
-              </div>
+            <div class="flex items-center gap-2 mt-2 xl:mt-0 shrink-0 flex-wrap">
+              <button
+                @click="executeTask(task.id)"
+                class="px-3 py-1 text-sm font-bold text-brutalist-green hover:bg-green-50 rounded border-2 border-black transition-all"
+              >
+                立即执行
+              </button>
+              <button
+                @click="toggleTask(task.id, !task.enabled)"
+                :class="[
+                  'px-3 py-1 text-sm font-bold rounded border-2 border-black transition-all',
+                  task.enabled
+                    ? 'text-gray-700 hover:bg-gray-50'
+                    : 'text-brutalist-green hover:bg-green-50'
+                ]"
+              >
+                {{ task.enabled ? '禁用' : '启用' }}
+              </button>
+              <button
+                @click="editTask(task)"
+                class="px-3 py-1 text-sm font-bold text-brutalist-blue hover:bg-blue-50 rounded border-2 border-black transition-all"
+              >
+                编辑
+              </button>
+              <button
+                @click="deleteTask(task.id)"
+                class="px-3 py-1 text-sm font-bold text-brutalist-red hover:bg-red-50 rounded border-2 border-black transition-all"
+              >
+                删除
+              </button>
             </div>
           </div>
         </div>
@@ -122,6 +127,13 @@ const tasks = ref([])
 const loading = ref(false)
 const showModal = ref(false)
 const editingTask = ref(null)
+
+const formatDateTime = (dateStr) => {
+  if (!dateStr) return 'N/A'
+  const date = new Date(dateStr)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
 
 const loadTasks = async () => {
   loading.value = true

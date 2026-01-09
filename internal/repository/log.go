@@ -19,6 +19,12 @@ func (r *LogRepository) FindAll() ([]model.BackupLog, error) {
 	return logs, err
 }
 
+func (r *LogRepository) FindByTaskID(taskID uint) ([]model.BackupLog, error) {
+	var logs []model.BackupLog
+	err := r.db.Where("task_id = ?", taskID).Order("created_at DESC").Find(&logs).Error
+	return logs, err
+}
+
 func (r *LogRepository) Create(log *model.BackupLog) error {
 	return r.db.Create(log).Error
 }
