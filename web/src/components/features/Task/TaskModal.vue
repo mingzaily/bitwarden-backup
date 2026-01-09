@@ -120,7 +120,8 @@ watch(() => props.task, (newTask) => {
 
 const loadServers = async () => {
   try {
-    servers.value = await serversApi.getAll()
+    const res = await serversApi.getAll({ page: 1, page_size: 1000 })
+    servers.value = res.data || []
   } catch (error) {
     console.error('Failed to load servers:', error)
   }
@@ -128,7 +129,8 @@ const loadServers = async () => {
 
 const loadDestinations = async () => {
   try {
-    destinations.value = await destinationsApi.getAll()
+    const res = await destinationsApi.getAll({ page: 1, page_size: 1000 })
+    destinations.value = res.data || []
   } catch (error) {
     console.error('Failed to load destinations:', error)
   }

@@ -108,6 +108,12 @@ func UpdateDestination(c *gin.Context) {
 		existing.TargetServerID = req.TargetServerID
 		existing.Encrypted = req.Encrypted
 		existing.Enabled = req.Enabled
+	// 更新备份保留份数配置
+		if req.MaxBackupCount < 0 {
+			req.MaxBackupCount = 0
+		}
+		existing.MaxBackupCount = req.MaxBackupCount
+
 
 		// 敏感字段：空值不更新
 		if req.WebDAVPassword != "" {

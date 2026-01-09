@@ -42,7 +42,7 @@ func (c *Client) Unlock(masterPassword string) error {
 	// 清理 stderr 中的密码提示信息，只保留有意义的错误信息
 	if stderr != "" {
 		// 移除重复的密码提示 "? Master password: [input is hidden]" 或 "[hidden]"
-		cleanStderr := cleanPasswordPrompts(stderr)
+		cleanStderr := sanitizeBWOutput(stderr)
 		if cleanStderr != "" {
 			c.AddLog(fmt.Sprintf("bw unlock stderr: %s", cleanStderr))
 		}

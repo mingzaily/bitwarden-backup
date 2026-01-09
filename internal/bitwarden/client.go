@@ -35,15 +35,40 @@ func NewClient() *Client {
 // 格式: ESC[ + 参数 + 命令字母，其中 ESC 可以是 \x1b 或 \033
 var ansiRegex = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
+// 敏感输出正则表达式（匹配密码提示、输入隐藏等）
+var sensitiveOutputRegex = regexp.MustCompile(`(?im)(?:master\s*password|password:|input\s+is\s+hidden|\[hidden\]|\[input\s+is\s+hidden\]).*`)
+// Session token 正则表达式（匹配长字符串）
+var tokenRegex = regexp.MustCompile(`[a-zA-Z0-9+/]{64,}`)
+
 // stripANSI 移除字符串中的 ANSI 转义序列
 func stripANSI(s string) string {
 	return ansiRegex.ReplaceAllString(s, "")
 }
 
+// sanitizeBWOutput 统一脱敏 Bitwarden CLI 输出
+func sanitizeBWOutput(s string) string {
+	s = stripANSI(s)
+	// 移除包含敏感关键词的整行
+	lines := strings.Split(s, "\n")
+	var cleaned []string
+	for _, line := range lines {
+		if !sensitiveOutputRegex.MatchString(line) {
+			cleaned = append(cleaned, line)
+		}
+	}
+	s = strings.Join(cleaned, "\n")
+	// 掩码可能的 token
+	s = tokenRegex.ReplaceAllString(s, "***")
+	return strings.TrimSpace(s)
+}
+
 // AddLog 添加一条日志
 func (c *Client) AddLog(message string) {
-	// 移除 ANSI 转义序列
-	cleanMessage := stripANSI(message)
+	// 统一脱敏处理
+	cleanMessage := sanitizeBWOutput(message)
+	if cleanMessage == "" {
+		return // 如果脱敏后为空，不记录日志
+	}
 	c.logs = append(c.logs, LogEntry{
 		Time:    time.Now().Format("2006/01/02 15:04:05"),
 		Message: cleanMessage,

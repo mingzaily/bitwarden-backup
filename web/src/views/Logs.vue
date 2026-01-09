@@ -250,7 +250,8 @@ const handlePageChange = (page) => {
 
 const loadTasks = async () => {
   try {
-    tasks.value = await tasksApi.getAll()
+    const res = await tasksApi.getAll()
+    tasks.value = res.data || []
   } catch (error) {
     console.error('Failed to load tasks:', error)
   }

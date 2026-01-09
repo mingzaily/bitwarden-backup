@@ -349,7 +349,8 @@ watch(() => props.destination, (newDest) => {
 
 const loadServers = async () => {
   try {
-    servers.value = await serversApi.getAll({ enabled: true })
+    const res = await serversApi.getAll({ enabled: true })
+    servers.value = res.data || []
   } catch (error) {
     console.error('Failed to load servers:', error)
   }
