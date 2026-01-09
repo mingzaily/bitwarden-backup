@@ -18,3 +18,11 @@ type DestinationProvider interface {
 	// Backup 执行备份操作，返回最终存储路径
 	Backup(ctx BackupContext) (string, error)
 }
+
+// RetentionProvider 支持备份保留策略的提供者接口
+type RetentionProvider interface {
+	// Cleanup 清理超出保留数量的旧备份
+	// maxCount: 最大保留数量
+	// 返回删除的文件数量和错误
+	Cleanup(dest model.BackupDestination, maxCount int) (int, error)
+}

@@ -102,3 +102,21 @@ func (r *TaskRepository) UpdateWithDestinations(task *model.BackupTask, destinat
 func (r *TaskRepository) Delete(id uint) error {
 	return r.db.Delete(&model.BackupTask{}, id).Error
 }
+
+// FindPaginated 分页查询任务
+func (r *TaskRepository) FindPaginated(params model.PaginationParams) ([]model.BackupTask, int64, error) {
+	var tasks []model.BackupTask
+	var total int64
+
+	if err := r.db.Model(&model.BackupTask{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := r.db.Preload("SourceServer").Preload("Destinations").
+		Order("created_at DESC").
+		Offset(params.GetOffset()).
+		Limit(params.GetLimit()).
+		Find(&tasks).Error
+
+	return tasks, total, err
+}

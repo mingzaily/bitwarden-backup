@@ -7,19 +7,58 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
+	"time"
 )
+
+// LogEntry 单条执行日志
+type LogEntry struct {
+	Time    string `json:"time"`
+	Message string `json:"message"`
+}
 
 // Client Bitwarden CLI 客户端
 type Client struct {
 	sessionToken  string
 	serverURL     string
 	vaultUnlocked bool
+	logs          []LogEntry
 }
 
 // NewClient 创建新的 Bitwarden 客户端
 func NewClient() *Client {
-	return &Client{}
+	return &Client{logs: make([]LogEntry, 0)}
+}
+
+// ansiRegex 匹配 ANSI 转义序列
+// 格式: ESC[ + 参数 + 命令字母，其中 ESC 可以是 \x1b 或 \033
+var ansiRegex = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+
+// stripANSI 移除字符串中的 ANSI 转义序列
+func stripANSI(s string) string {
+	return ansiRegex.ReplaceAllString(s, "")
+}
+
+// AddLog 添加一条日志
+func (c *Client) AddLog(message string) {
+	// 移除 ANSI 转义序列
+	cleanMessage := stripANSI(message)
+	c.logs = append(c.logs, LogEntry{
+		Time:    time.Now().Format("2006/01/02 15:04:05"),
+		Message: cleanMessage,
+	})
+	log.Printf("[bitwarden] %s", cleanMessage)
+}
+
+// GetLogs 获取所有日志
+func (c *Client) GetLogs() []LogEntry {
+	return c.logs
+}
+
+// ClearLogs 清空日志
+func (c *Client) ClearLogs() {
+	c.logs = make([]LogEntry, 0)
 }
 
 type bwExecResult struct {
@@ -81,7 +120,7 @@ func (c *Client) runBW(args []string, stdin string, extraEnv map[string]string) 
 		ExitCode: exitCode,
 	}
 
-	log.Printf("[bitwarden] bw %s (exit=%d)", strings.Join(redactBWArgs(args), " "), exitCode)
+	c.AddLog(fmt.Sprintf("bw %s (exit=%d)", strings.Join(redactBWArgs(args), " "), exitCode))
 	return res, err
 }
 
@@ -96,10 +135,10 @@ func (c *Client) Status() (string, error) {
 	stderr := strings.TrimSpace(res.Stderr)
 
 	if stdout != "" {
-		log.Printf("[bitwarden] bw status stdout: %s", stdout)
+		c.AddLog(fmt.Sprintf("bw status stdout: %s", stdout))
 	}
 	if stderr != "" {
-		log.Printf("[bitwarden] bw status stderr: %s", stderr)
+		c.AddLog(fmt.Sprintf("bw status stderr: %s", stderr))
 	}
 	if err != nil {
 		return "", fmt.Errorf("bw status failed (exit=%d)", res.ExitCode)
@@ -120,10 +159,10 @@ func (c *Client) ConfigServer(serverURL string) error {
 	res, err := c.runBW([]string{"config", "server", serverURL}, "", nil)
 	if err != nil {
 		if strings.TrimSpace(res.Stdout) != "" {
-			log.Printf("[bitwarden] bw config server stdout: %s", strings.TrimSpace(res.Stdout))
+			c.AddLog(fmt.Sprintf("bw config server stdout: %s", strings.TrimSpace(res.Stdout)))
 		}
 		if strings.TrimSpace(res.Stderr) != "" {
-			log.Printf("[bitwarden] bw config server stderr: %s", strings.TrimSpace(res.Stderr))
+			c.AddLog(fmt.Sprintf("bw config server stderr: %s", strings.TrimSpace(res.Stderr)))
 		}
 		return fmt.Errorf("config server failed (exit=%d): %w", res.ExitCode, err)
 	}
@@ -143,10 +182,10 @@ func (c *Client) Login(clientID, clientSecret string) error {
 	)
 	if err != nil {
 		if strings.TrimSpace(res.Stdout) != "" {
-			log.Printf("[bitwarden] bw login stdout: %s", strings.TrimSpace(res.Stdout))
+			c.AddLog(fmt.Sprintf("bw login stdout: %s", strings.TrimSpace(res.Stdout)))
 		}
 		if strings.TrimSpace(res.Stderr) != "" {
-			log.Printf("[bitwarden] bw login stderr: %s", strings.TrimSpace(res.Stderr))
+			c.AddLog(fmt.Sprintf("bw login stderr: %s", strings.TrimSpace(res.Stderr)))
 		}
 		return fmt.Errorf("login failed (exit=%d): %w", res.ExitCode, err)
 	}

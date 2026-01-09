@@ -29,6 +29,9 @@ func main() {
 	sched.Start()
 	defer sched.Stop()
 
+	// 将调度器注入到 Handler 层，支持动态更新任务
+	handler.SetScheduler(sched)
+
 	// 初始化 Gin 路由
 	r := setupRouter(cfg)
 

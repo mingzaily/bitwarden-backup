@@ -46,3 +46,8 @@ func (s *DestinationService) Toggle(id uint) error {
 	dest.Enabled = !dest.Enabled
 	return s.repo.Update(dest)
 }
+
+// GetPaginated 分页获取备份目标
+func (s *DestinationService) GetPaginated(params model.PaginationParams) ([]model.BackupDestination, int64, error) {
+	return s.repo.FindPaginated(params)
+}

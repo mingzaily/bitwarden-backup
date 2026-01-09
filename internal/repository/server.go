@@ -40,3 +40,25 @@ func (r *ServerRepository) UpdateEnabled(id uint, enabled bool) error {
 func (r *ServerRepository) Delete(id uint) error {
 	return r.db.Delete(&model.ServerConfig{}, id).Error
 }
+
+// FindPaginated 分页查询服务器
+func (r *ServerRepository) FindPaginated(params model.PaginationParams, enabled *bool) ([]model.ServerConfig, int64, error) {
+	var servers []model.ServerConfig
+	var total int64
+
+	query := r.db.Model(&model.ServerConfig{})
+	if enabled != nil {
+		query = query.Where("enabled = ?", *enabled)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := query.Order("created_at DESC").
+		Offset(params.GetOffset()).
+		Limit(params.GetLimit()).
+		Find(&servers).Error
+
+	return servers, total, err
+}

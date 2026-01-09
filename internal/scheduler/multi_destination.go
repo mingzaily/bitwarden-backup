@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -30,6 +31,17 @@ func (s *Scheduler) performBackupToDestinations(task model.BackupTask, backupLog
 	}
 
 	client := bitwarden.NewClient()
+
+	// 使用 defer 确保无论成功还是失败都保存执行日志
+	defer func() {
+		if logs := client.GetLogs(); len(logs) > 0 {
+			if logsJSON, err := json.Marshal(logs); err == nil {
+				backupLog.ExecutionLogs = string(logsJSON)
+			}
+		}
+	}()
+
+	client.AddLog(fmt.Sprintf("Executing task: %s", task.Name))
 	_ = client.Logout()
 
 	if err := client.ConfigServer(sourceServer.ServerURL); err != nil {
@@ -41,7 +53,19 @@ func (s *Scheduler) performBackupToDestinations(task model.BackupTask, backupLog
 	}
 
 	if err := client.Unlock(sourceServer.MasterPassword); err != nil {
-		return fmt.Errorf("failed to unlock: %w", err)
+		// 检测登录状态损坏，尝试重新登录
+		if _, ok := err.(*bitwarden.ErrNotLoggedIn); ok {
+			log.Printf("Login state corrupted, retrying login...")
+			_ = client.Logout()
+			if err := client.Login(sourceServer.ClientID, sourceServer.ClientSecret); err != nil {
+				return fmt.Errorf("failed to re-login: %w", err)
+			}
+			if err := client.Unlock(sourceServer.MasterPassword); err != nil {
+				return fmt.Errorf("failed to unlock after re-login: %w", err)
+			}
+		} else {
+			return fmt.Errorf("failed to unlock: %w", err)
+		}
 	}
 
 	timestamp := time.Now().Format("20060102_150405")
@@ -123,5 +147,6 @@ func (s *Scheduler) performBackupToDestinations(task model.BackupTask, backupLog
 	}
 
 	client.Logout()
+
 	return nil
 }

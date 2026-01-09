@@ -25,6 +25,28 @@ func (r *LogRepository) FindByTaskID(taskID uint) ([]model.BackupLog, error) {
 	return logs, err
 }
 
+// FindPaginated 分页查询日志
+func (r *LogRepository) FindPaginated(params model.PaginationParams, taskID *uint) ([]model.BackupLog, int64, error) {
+	var logs []model.BackupLog
+	var total int64
+
+	query := r.db.Model(&model.BackupLog{})
+	if taskID != nil {
+		query = query.Where("task_id = ?", *taskID)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := query.Order("created_at DESC").
+		Offset(params.GetOffset()).
+		Limit(params.GetLimit()).
+		Find(&logs).Error
+
+	return logs, total, err
+}
+
 func (r *LogRepository) Create(log *model.BackupLog) error {
 	return r.db.Create(log).Error
 }

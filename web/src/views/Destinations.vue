@@ -50,13 +50,13 @@
                 <span :class="getTypeBadgeClass(destination.type)">
                   {{ destination.type_label || getTypeLabel(destination.type) }}
                 </span>
-                <!-- 加密状态图标（仅非服务器类型显示） -->
+                <!-- 加密状态徽章（仅非服务器类型显示） -->
                 <span
                   v-if="destination.type !== 'server' && destination.encrypted"
-                  class="text-lg cursor-help"
+                  class="px-2 py-0.5 text-xs font-bold rounded border-2 border-black bg-purple-600 text-white cursor-help"
                   title="已启用 AES-256-GCM 加密"
                 >
-                  🔒
+                  加密
                 </span>
               </div>
               <div class="flex items-center text-sm mb-2">
@@ -103,6 +103,15 @@
       </div>
     </div>
 
+    <!-- Pagination -->
+    <Pagination
+      :page="pagination.page"
+      :page-size="pagination.page_size"
+      :total="pagination.total"
+      :total-page="pagination.total_page"
+      @page-change="handlePageChange"
+    />
+
     <!-- Destination Modal -->
     <DestinationModal
       v-if="showModal"
@@ -119,6 +128,7 @@ import { destinationsApi } from '@/api'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import DestinationModal from '@/components/features/Destination/DestinationModal.vue'
+import Pagination from '@/components/ui/Pagination.vue'
 
 const toast = useToast()
 const { confirm } = useConfirm()
@@ -126,6 +136,12 @@ const destinations = ref([])
 const loading = ref(false)
 const showModal = ref(false)
 const editingDestination = ref(null)
+const pagination = ref({
+  page: 1,
+  page_size: 10,
+  total: 0,
+  total_page: 0
+})
 
 const formatDateTime = (dateStr) => {
   if (!dateStr) return 'N/A'
@@ -171,13 +187,23 @@ const getTypeBadgeClass = (type) => {
 const loadDestinations = async () => {
   loading.value = true
   try {
-    destinations.value = await destinationsApi.getAll()
+    const res = await destinationsApi.getAll({
+      page: pagination.value.page,
+      page_size: pagination.value.page_size
+    })
+    destinations.value = res.data
+    pagination.value = res.pagination
   } catch (error) {
     console.error('Failed to load destinations:', error)
     toast.error('加载备份目标失败')
   } finally {
     loading.value = false
   }
+}
+
+const handlePageChange = (page) => {
+  pagination.value.page = page
+  loadDestinations()
 }
 
 const editDestination = (destination) => {

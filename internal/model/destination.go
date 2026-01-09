@@ -38,6 +38,9 @@ type BackupDestination struct {
 	Encrypted          bool   `gorm:"default:false" json:"encrypted"`
 	EncryptionPassword string `gorm:"size:500" json:"encryption_password"`
 
+	// 备份保留策略
+	MaxBackupCount int `gorm:"default:0" json:"max_backup_count"` // 0 表示不限制
+
 	Enabled   bool      `gorm:"default:true" json:"enabled"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -125,6 +128,7 @@ type DestinationResponse struct {
 	S3Path         string    `json:"s3_path,omitempty"`
 	TargetServerID *uint     `json:"target_server_id,omitempty"`
 	Encrypted      bool      `json:"encrypted"`
+	MaxBackupCount int       `json:"max_backup_count"`
 	Enabled        bool      `json:"enabled"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
@@ -149,6 +153,7 @@ func (d *BackupDestination) ToResponse() DestinationResponse {
 		S3Path:         d.S3Path,
 		TargetServerID: d.TargetServerID,
 		Encrypted:      d.Encrypted,
+		MaxBackupCount: d.MaxBackupCount,
 		Enabled:        d.Enabled,
 		CreatedAt:      d.CreatedAt,
 		UpdatedAt:      d.UpdatedAt,

@@ -8,19 +8,35 @@ import (
 	"github.com/mingzaily/bitwarden-backup/internal/model"
 )
 
-// GetServers 获取所有服务器配置
+// GetServers 获取所有服务器配置（支持分页）
 func GetServers(c *gin.Context) {
-	servers, err := serverSvc.GetAll()
+	var params model.PaginationParams
+	if err := c.ShouldBindQuery(&params); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 解析 enabled 参数
+	var enabled *bool
+	if enabledStr := c.Query("enabled"); enabledStr != "" {
+		e := enabledStr == "true"
+		enabled = &e
+	}
+
+	servers, total, err := serverSvc.GetPaginated(params, enabled)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	// 转换为响应结构，隐藏敏感字段
+
+	// 转换为响应结构
 	responses := make([]model.ServerResponse, len(servers))
 	for i, s := range servers {
 		responses[i] = s.ToResponse()
 	}
-	c.JSON(http.StatusOK, responses)
+
+	resp := model.NewPaginatedResponse(responses, params.Page, params.GetLimit(), total)
+	c.JSON(http.StatusOK, resp)
 }
 
 // GetServer 获取单个服务器配置

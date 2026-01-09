@@ -24,19 +24,28 @@ func validateSourceDestination(sourceServerID uint, destinationIDs []uint) error
 	return nil
 }
 
-// GetTasks 获取所有任务
+// GetTasks 获取所有任务（支持分页）
 func GetTasks(c *gin.Context) {
-	tasks, err := taskSvc.GetAll()
+	var params model.PaginationParams
+	if err := c.ShouldBindQuery(&params); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	tasks, total, err := taskSvc.GetPaginated(params)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	// 转换为响应结构，隐藏敏感字段
+
+	// 转换为响应结构
 	responses := make([]model.TaskResponse, len(tasks))
 	for i, t := range tasks {
 		responses[i] = t.ToResponse()
 	}
-	c.JSON(http.StatusOK, responses)
+
+	resp := model.NewPaginatedResponse(responses, params.Page, params.GetLimit(), total)
+	c.JSON(http.StatusOK, resp)
 }
 
 // GetTask 获取单个任务
@@ -82,6 +91,19 @@ func CreateTask(c *gin.Context) {
 
 	// 返回创建后的完整任务
 	createdTask, _ := taskSvc.GetByID(task.ID)
+
+	// 动态添加到调度器
+	if taskScheduler != nil && createdTask.Enabled && createdTask.CronExpression != "" {
+		if err := taskScheduler.AddTask(*createdTask); err != nil {
+			// 记录错误但不影响创建结果
+			c.JSON(http.StatusCreated, gin.H{
+				"data":    createdTask.ToResponse(),
+				"warning": "任务已创建，但添加到调度器失败: " + err.Error(),
+			})
+			return
+		}
+	}
+
 	c.JSON(http.StatusCreated, createdTask.ToResponse())
 }
 
@@ -134,6 +156,18 @@ func UpdateTask(c *gin.Context) {
 
 	// 返回更新后的完整任务
 	updatedTask, _ := taskSvc.GetByID(uint(id))
+
+	// 动态更新调度器
+	if taskScheduler != nil && updatedTask != nil {
+		if err := taskScheduler.UpdateTask(*updatedTask); err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"data":    updatedTask.ToResponse(),
+				"warning": "任务已更新，但同步调度器失败: " + err.Error(),
+			})
+			return
+		}
+	}
+
 	c.JSON(http.StatusOK, updatedTask.ToResponse())
 }
 
@@ -144,6 +178,12 @@ func DeleteTask(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 		return
 	}
+
+	// 先从调度器移除任务
+	if taskScheduler != nil {
+		taskScheduler.RemoveTask(uint(id))
+	}
+
 	if err := taskSvc.Delete(uint(id)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -118,6 +118,15 @@
       </div>
     </div>
 
+    <!-- Pagination -->
+    <Pagination
+      :page="pagination.page"
+      :page-size="pagination.page_size"
+      :total="pagination.total"
+      :total-page="pagination.total_page"
+      @page-change="handlePageChange"
+    />
+
     <TaskModal v-if="showModal" :task="editingTask" @close="closeModal" @saved="handleSaved" />
   </div>
 </template>
@@ -129,6 +138,7 @@ import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import TaskModal from '@/components/features/Task/TaskModal.vue'
 import BackupFlow from '@/components/features/Task/BackupFlow.vue'
+import Pagination from '@/components/ui/Pagination.vue'
 
 const toast = useToast()
 const { confirm } = useConfirm()
@@ -136,6 +146,12 @@ const tasks = ref([])
 const loading = ref(false)
 const showModal = ref(false)
 const editingTask = ref(null)
+const pagination = ref({
+  page: 1,
+  page_size: 10,
+  total: 0,
+  total_page: 0
+})
 
 const formatDateTime = (dateStr) => {
   if (!dateStr) return 'N/A'
@@ -147,13 +163,23 @@ const formatDateTime = (dateStr) => {
 const loadTasks = async () => {
   loading.value = true
   try {
-    tasks.value = await tasksApi.getAll()
+    const res = await tasksApi.getAll({
+      page: pagination.value.page,
+      page_size: pagination.value.page_size
+    })
+    tasks.value = res.data
+    pagination.value = res.pagination
   } catch (error) {
     console.error('Failed to load tasks:', error)
     toast.error('加载任务列表失败')
   } finally {
     loading.value = false
   }
+}
+
+const handlePageChange = (page) => {
+  pagination.value.page = page
+  loadTasks()
 }
 
 const editTask = (task) => {

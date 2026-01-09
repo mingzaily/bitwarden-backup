@@ -50,3 +50,8 @@ func (s *TaskService) UpdateWithDestinations(id uint, task *model.BackupTask, de
 func (s *TaskService) Delete(id uint) error {
 	return s.repo.Delete(id)
 }
+
+// GetPaginated 分页获取任务
+func (s *TaskService) GetPaginated(params model.PaginationParams) ([]model.BackupTask, int64, error) {
+	return s.repo.FindPaginated(params)
+}

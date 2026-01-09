@@ -37,3 +37,8 @@ func (s *ServerService) UpdateEnabled(id uint, enabled bool) error {
 func (s *ServerService) Delete(id uint) error {
 	return s.repo.Delete(id)
 }
+
+// GetPaginated 分页获取服务器
+func (s *ServerService) GetPaginated(params model.PaginationParams, enabled *bool) ([]model.ServerConfig, int64, error) {
+	return s.repo.FindPaginated(params, enabled)
+}

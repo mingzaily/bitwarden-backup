@@ -2,7 +2,6 @@ package bitwarden
 
 import (
 	"fmt"
-	"log"
 	"strings"
 )
 
@@ -20,10 +19,10 @@ func (c *Client) Import(inputPath, format string) error {
 	res, err := c.runBW(args, "", nil)
 	if err != nil {
 		if strings.TrimSpace(res.Stdout) != "" {
-			log.Printf("[bitwarden] bw import stdout: %s", strings.TrimSpace(res.Stdout))
+			c.AddLog(fmt.Sprintf("bw import stdout: %s", strings.TrimSpace(res.Stdout)))
 		}
 		if strings.TrimSpace(res.Stderr) != "" {
-			log.Printf("[bitwarden] bw import stderr: %s", strings.TrimSpace(res.Stderr))
+			c.AddLog(fmt.Sprintf("bw import stderr: %s", strings.TrimSpace(res.Stderr)))
 		}
 		return fmt.Errorf("import failed (exit=%d): %w", res.ExitCode, err)
 	}
@@ -35,11 +34,19 @@ func (c *Client) Import(inputPath, format string) error {
 func (c *Client) Logout() error {
 	res, err := c.runBW([]string{"logout"}, "", nil)
 	if err != nil {
-		if strings.TrimSpace(res.Stdout) != "" {
-			log.Printf("[bitwarden] bw logout stdout: %s", strings.TrimSpace(res.Stdout))
+		stderr := strings.TrimSpace(res.Stderr)
+		// "You are not logged in" 意味着已经是登出状态，不算错误
+		if strings.Contains(stderr, "You are not logged in") {
+			c.AddLog("bw logout: already logged out")
+			c.sessionToken = ""
+			c.vaultUnlocked = false
+			return nil
 		}
-		if strings.TrimSpace(res.Stderr) != "" {
-			log.Printf("[bitwarden] bw logout stderr: %s", strings.TrimSpace(res.Stderr))
+		if strings.TrimSpace(res.Stdout) != "" {
+			c.AddLog(fmt.Sprintf("bw logout stdout: %s", strings.TrimSpace(res.Stdout)))
+		}
+		if stderr != "" {
+			c.AddLog(fmt.Sprintf("bw logout stderr: %s", stderr))
 		}
 		return fmt.Errorf("logout failed (exit=%d): %w", res.ExitCode, err)
 	}

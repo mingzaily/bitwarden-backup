@@ -8,19 +8,28 @@ import (
 	"github.com/mingzaily/bitwarden-backup/internal/model"
 )
 
-// GetDestinations 获取所有备份目标
+// GetDestinations 获取所有备份目标（支持分页）
 func GetDestinations(c *gin.Context) {
-	dests, err := destinationSvc.GetAll()
+	var params model.PaginationParams
+	if err := c.ShouldBindQuery(&params); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	dests, total, err := destinationSvc.GetPaginated(params)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	// 转换为响应结构，隐藏敏感字段
+
+	// 转换为响应结构
 	responses := make([]model.DestinationResponse, len(dests))
 	for i, d := range dests {
 		responses[i] = d.ToResponse()
 	}
-	c.JSON(http.StatusOK, responses)
+
+	resp := model.NewPaginatedResponse(responses, params.Page, params.GetLimit(), total)
+	c.JSON(http.StatusOK, resp)
 }
 
 // GetDestination 获取单个备份目标

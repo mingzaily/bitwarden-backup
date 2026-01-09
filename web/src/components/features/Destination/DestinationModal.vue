@@ -209,6 +209,36 @@
           </div>
         </div>
 
+        <!-- 备份保留策略（仅本地、WebDAV、S3 显示） -->
+        <div v-if="['local', 'webdav', 's3'].includes(formData.type)" class="space-y-3">
+          <label class="block text-sm font-bold text-gray-900">备份保留策略</label>
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-700">限制保留数量</span>
+            <ToggleButton v-model="retentionEnabled" label="" />
+          </div>
+
+          <div v-if="retentionEnabled" class="mt-2">
+            <div class="relative">
+              <input
+                v-model.number="formData.max_backup_count"
+                type="number"
+                min="1"
+                class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue pr-10"
+                placeholder="5"
+              />
+              <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <span class="text-gray-500 font-bold text-sm">份</span>
+              </div>
+            </div>
+            <p class="text-xs text-red-600 mt-1 font-medium">
+              ⚠️ 超过限制时将自动删除最旧的备份文件
+            </p>
+          </div>
+          <p v-else class="text-xs text-gray-500 mt-1">
+            💡 当前保留所有历史备份文件（不限制数量）
+          </p>
+        </div>
+
         <!-- Modal Footer -->
         <div class="flex justify-end gap-3 pt-4 border-t-2 border-black">
           <button
@@ -273,10 +303,12 @@ const formData = ref({
   target_server_id: '',
   enabled: true,
   encrypted: false,
-  encryption_password: ''
+  encryption_password: '',
+  max_backup_count: 5
 })
 
 const loading = ref(false)
+const retentionEnabled = ref(false)
 
 watch(() => props.destination, (newDest) => {
   if (newDest) {
@@ -286,8 +318,10 @@ watch(() => props.destination, (newDest) => {
       local_path: newDest.local_path || (newDest.type === 'local' ? newDest.path : ''),
       target_server_id: newDest.target_server_id || '',
       encrypted: newDest.encrypted || false,
-      encryption_password: newDest.encryption_password || ''
+      encryption_password: newDest.encryption_password || '',
+      max_backup_count: newDest.max_backup_count || 5
     }
+    retentionEnabled.value = (newDest.max_backup_count && newDest.max_backup_count > 0)
   } else {
     formData.value = {
       name: '',
@@ -306,8 +340,10 @@ watch(() => props.destination, (newDest) => {
       target_server_id: '',
       enabled: true,
       encrypted: false,
-      encryption_password: ''
+      encryption_password: '',
+      max_backup_count: 5
     }
+    retentionEnabled.value = false
   }
 }, { immediate: true })
 
@@ -356,6 +392,13 @@ const handleSubmit = async () => {
     }
     if (data.type === 's3' && (!data.s3_path || data.s3_path.trim() === '')) {
       data.s3_path = '/bitwarden-backup'
+    }
+
+    // 处理备份保留数量
+    if (!retentionEnabled.value) {
+      data.max_backup_count = 0
+    } else {
+      data.max_backup_count = Number(data.max_backup_count) || 5
     }
 
     if (props.destination?.id) {

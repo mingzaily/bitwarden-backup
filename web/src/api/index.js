@@ -18,7 +18,11 @@ const handleResponse = async (response) => {
 // Servers API
 export const serversApi = {
   getAll: (params = {}) => {
-    const queryString = params.enabled !== undefined ? `?enabled=${params.enabled}` : ''
+    const query = new URLSearchParams()
+    if (params.enabled !== undefined) query.append('enabled', params.enabled)
+    if (params.page) query.append('page', params.page)
+    if (params.page_size) query.append('page_size', params.page_size)
+    const queryString = query.toString() ? `?${query.toString()}` : ''
     return fetch(`${API_BASE}/servers${queryString}`).then(handleResponse)
   },
   getById: (id) => fetch(`${API_BASE}/servers/${id}`).then(handleResponse),
@@ -39,7 +43,13 @@ export const serversApi = {
 
 // Destinations API
 export const destinationsApi = {
-  getAll: () => fetch(`${API_BASE}/destinations`).then(handleResponse),
+  getAll: (params = {}) => {
+    const query = new URLSearchParams()
+    if (params.page) query.append('page', params.page)
+    if (params.page_size) query.append('page_size', params.page_size)
+    const queryString = query.toString() ? `?${query.toString()}` : ''
+    return fetch(`${API_BASE}/destinations${queryString}`).then(handleResponse)
+  },
   getById: (id) => fetch(`${API_BASE}/destinations/${id}`).then(handleResponse),
   create: (data) => fetch(`${API_BASE}/destinations`, {
     method: 'POST',
@@ -58,7 +68,13 @@ export const destinationsApi = {
 
 // Tasks API
 export const tasksApi = {
-  getAll: () => fetch(`${API_BASE}/tasks`).then(handleResponse),
+  getAll: (params = {}) => {
+    const query = new URLSearchParams()
+    if (params.page) query.append('page', params.page)
+    if (params.page_size) query.append('page_size', params.page_size)
+    const queryString = query.toString() ? `?${query.toString()}` : ''
+    return fetch(`${API_BASE}/tasks${queryString}`).then(handleResponse)
+  },
   getById: (id) => fetch(`${API_BASE}/tasks/${id}`).then(handleResponse),
   create: (data) => fetch(`${API_BASE}/tasks`, {
     method: 'POST',
@@ -84,6 +100,8 @@ export const logsApi = {
   getAll: (params = {}) => {
     const query = new URLSearchParams()
     if (params.task_id) query.append('task_id', params.task_id)
+    if (params.page) query.append('page', params.page)
+    if (params.page_size) query.append('page_size', params.page_size)
     const queryString = query.toString() ? `?${query.toString()}` : ''
     return fetch(`${API_BASE}/logs${queryString}`).then(handleResponse)
   }
