@@ -26,8 +26,8 @@ func (p *S3Provider) Type() string {
 	return "s3"
 }
 
-// Backup 执行 S3 备份
-func (p *S3Provider) Backup(ctx BackupContext) error {
+// Backup 执行 S3 备份，返回最终存储路径
+func (p *S3Provider) Backup(ctx BackupContext) (string, error) {
 	dest := ctx.Destination
 
 	// 创建 S3 客户端配置
@@ -40,7 +40,7 @@ func (p *S3Provider) Backup(ctx BackupContext) error {
 		config.WithRegion(dest.S3Region),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to load S3 config: %w", err)
+		return "", fmt.Errorf("failed to load S3 config: %w", err)
 	}
 
 	// 创建 S3 客户端
@@ -54,7 +54,7 @@ func (p *S3Provider) Backup(ctx BackupContext) error {
 	// 打开源文件
 	file, err := os.Open(ctx.SourceFile)
 	if err != nil {
-		return fmt.Errorf("failed to open source file: %w", err)
+		return "", fmt.Errorf("failed to open source file: %w", err)
 	}
 	defer file.Close()
 
@@ -72,10 +72,11 @@ func (p *S3Provider) Backup(ctx BackupContext) error {
 		Body:   file,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to upload to S3: %w", err)
+		return "", fmt.Errorf("failed to upload to S3: %w", err)
 	}
 
-	return nil
+	// 返回 S3 路径
+	return fmt.Sprintf("s3://%s/%s", dest.S3Bucket, key), nil
 }
 
 // getFileName 从路径中提取文件名

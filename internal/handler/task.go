@@ -99,25 +99,37 @@ func UpdateTask(c *gin.Context) {
 		return
 	}
 
-	// 校验源和目标不能相同
-	if err := validateSourceDestination(req.SourceServerID, req.DestinationIDs); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+	// 判断是否仅更新 enabled 状态（前端 toggle 操作只传 enabled 字段）
+	isToggleOnly := req.Enabled != nil && req.Name == "" && req.SourceServerID == 0 && len(req.DestinationIDs) == 0
 
-	task := &model.BackupTask{
-		Name:           req.Name,
-		SourceServerID: req.SourceServerID,
-		CronExpression: req.CronExpression,
-	}
+	if isToggleOnly {
+		// 仅更新 enabled 状态，不影响其他字段和关联
+		if err := taskSvc.UpdateEnabled(uint(id), *req.Enabled); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	} else {
+		// 完整更新任务
+		// 校验源和目标不能相同
+		if err := validateSourceDestination(req.SourceServerID, req.DestinationIDs); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
-	if req.Enabled != nil {
-		task.Enabled = *req.Enabled
-	}
+		task := &model.BackupTask{
+			Name:           req.Name,
+			SourceServerID: req.SourceServerID,
+			CronExpression: req.CronExpression,
+		}
 
-	if err := taskSvc.UpdateWithDestinations(uint(id), task, req.DestinationIDs); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		if req.Enabled != nil {
+			task.Enabled = *req.Enabled
+		}
+
+		if err := taskSvc.UpdateWithDestinations(uint(id), task, req.DestinationIDs); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
 	// 返回更新后的完整任务

@@ -30,6 +30,10 @@ func (s *ServerService) Update(id uint, server *model.ServerConfig) error {
 	return s.repo.Update(server)
 }
 
+func (s *ServerService) UpdateEnabled(id uint, enabled bool) error {
+	return s.repo.UpdateEnabled(id, enabled)
+}
+
 func (s *ServerService) Delete(id uint) error {
 	return s.repo.Delete(id)
 }

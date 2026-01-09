@@ -33,6 +33,10 @@ func (r *DestinationRepository) Update(dest *model.BackupDestination) error {
 	return r.db.Save(dest).Error
 }
 
+func (r *DestinationRepository) UpdateEnabled(id uint, enabled bool) error {
+	return r.db.Model(&model.BackupDestination{}).Where("id = ?", id).Update("enabled", enabled).Error
+}
+
 func (r *DestinationRepository) Delete(id uint) error {
 	return r.db.Delete(&model.BackupDestination{}, id).Error
 }

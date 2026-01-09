@@ -92,11 +92,7 @@ func (s *Scheduler) performBackupToDestinations(task model.BackupTask, backupLog
 		tempFiles = append(tempFiles, encryptedFile)
 	}
 
-	backupLog.BackupFile = plainFile
-	if plainFile == "" {
-		backupLog.BackupFile = encryptedFile
-	}
-
+	var backupPaths []string
 	for _, dest := range task.Destinations {
 		if !dest.Enabled {
 			continue
@@ -107,9 +103,17 @@ func (s *Scheduler) performBackupToDestinations(task model.BackupTask, backupLog
 			sourceFile = encryptedFile
 		}
 
-		if err := s.backupToDestination(dest, sourceFile, task.Name, timestamp); err != nil {
+		targetPath, err := s.backupToDestination(dest, sourceFile, task.Name, timestamp)
+		if err != nil {
 			log.Printf("Failed to backup to destination %s: %v", dest.Name, err)
+		} else if targetPath != "" {
+			backupPaths = append(backupPaths, targetPath)
 		}
+	}
+
+	// 存储第一个成功的备份路径
+	if len(backupPaths) > 0 {
+		backupLog.BackupFile = backupPaths[0]
 	}
 
 	for _, f := range tempFiles {

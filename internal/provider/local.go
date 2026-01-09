@@ -20,31 +20,31 @@ func (p *LocalProvider) Type() string {
 	return "local"
 }
 
-// Backup 执行本地备份
-func (p *LocalProvider) Backup(ctx BackupContext) error {
+// Backup 执行本地备份，返回最终存储路径
+func (p *LocalProvider) Backup(ctx BackupContext) (string, error) {
 	dest := ctx.Destination
 
 	if err := os.MkdirAll(dest.LocalPath, 0755); err != nil {
-		return fmt.Errorf("failed to create local directory: %w", err)
+		return "", fmt.Errorf("failed to create local directory: %w", err)
 	}
 
 	targetFile := filepath.Join(dest.LocalPath, fmt.Sprintf("backup_%s_%s.json", ctx.TaskName, ctx.Timestamp))
 
 	source, err := os.Open(ctx.SourceFile)
 	if err != nil {
-		return fmt.Errorf("failed to open source file: %w", err)
+		return "", fmt.Errorf("failed to open source file: %w", err)
 	}
 	defer source.Close()
 
 	target, err := os.Create(targetFile)
 	if err != nil {
-		return fmt.Errorf("failed to create target file: %w", err)
+		return "", fmt.Errorf("failed to create target file: %w", err)
 	}
 	defer target.Close()
 
 	if _, err := io.Copy(target, source); err != nil {
-		return fmt.Errorf("failed to copy file: %w", err)
+		return "", fmt.Errorf("failed to copy file: %w", err)
 	}
 
-	return nil
+	return targetFile, nil
 }

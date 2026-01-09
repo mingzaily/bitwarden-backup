@@ -78,7 +78,14 @@
             <div class="flex items-center gap-2 mt-2 xl:mt-0 shrink-0 flex-wrap">
               <button
                 @click="executeTask(task.id)"
-                class="px-3 py-1 text-sm font-bold text-brutalist-green hover:bg-green-50 rounded border-2 border-black transition-all"
+                :disabled="!task.enabled"
+                :class="[
+                  'px-3 py-1 text-sm font-bold rounded border-2 border-black transition-all',
+                  task.enabled
+                    ? 'text-brutalist-green hover:bg-green-50'
+                    : 'text-gray-400 cursor-not-allowed bg-gray-100'
+                ]"
+                :title="task.enabled ? '' : '请先启用任务'"
               >
                 立即执行
               </button>
@@ -119,10 +126,12 @@
 import { ref, onMounted } from 'vue'
 import { tasksApi } from '@/api'
 import { useToast } from '@/composables/useToast'
+import { useConfirm } from '@/composables/useConfirm'
 import TaskModal from '@/components/features/Task/TaskModal.vue'
 import BackupFlow from '@/components/features/Task/BackupFlow.vue'
 
 const toast = useToast()
+const { confirm } = useConfirm()
 const tasks = ref([])
 const loading = ref(false)
 const showModal = ref(false)
@@ -182,7 +191,13 @@ const toggleTask = async (id, enabled) => {
 }
 
 const executeTask = async (id) => {
-  if (!confirm('确定要立即执行此备份任务吗？')) return
+  const confirmed = await confirm({
+    title: '执行备份任务',
+    message: '确定要立即执行此备份任务吗？',
+    type: 'warning',
+    confirmText: '执行'
+  })
+  if (!confirmed) return
 
   try {
     await tasksApi.execute(id)
@@ -194,7 +209,13 @@ const executeTask = async (id) => {
 }
 
 const deleteTask = async (id) => {
-  if (!confirm('确定要删除这个备份任务吗？')) return
+  const confirmed = await confirm({
+    title: '删除任务',
+    message: '确定要删除这个备份任务吗？此操作不可恢复。',
+    type: 'danger',
+    confirmText: '删除'
+  })
+  if (!confirmed) return
 
   try {
     await tasksApi.delete(id)

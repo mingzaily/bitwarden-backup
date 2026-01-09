@@ -38,6 +38,10 @@ func (s *TaskService) Update(id uint, task *model.BackupTask) error {
 	return s.repo.Update(task)
 }
 
+func (s *TaskService) UpdateEnabled(id uint, enabled bool) error {
+	return s.repo.UpdateEnabled(id, enabled)
+}
+
 func (s *TaskService) UpdateWithDestinations(id uint, task *model.BackupTask, destinationIDs []uint) error {
 	task.ID = id
 	return s.repo.UpdateWithDestinations(task, destinationIDs)

@@ -30,6 +30,10 @@ func (s *DestinationService) Update(id uint, dest *model.BackupDestination) erro
 	return s.repo.Update(dest)
 }
 
+func (s *DestinationService) UpdateEnabled(id uint, enabled bool) error {
+	return s.repo.UpdateEnabled(id, enabled)
+}
+
 func (s *DestinationService) Delete(id uint) error {
 	return s.repo.Delete(id)
 }

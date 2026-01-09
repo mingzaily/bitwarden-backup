@@ -15,6 +15,6 @@ type DestinationProvider interface {
 	// Type 返回提供者类型标识
 	Type() string
 
-	// Backup 执行备份操作
-	Backup(ctx BackupContext) error
+	// Backup 执行备份操作，返回最终存储路径
+	Backup(ctx BackupContext) (string, error)
 }

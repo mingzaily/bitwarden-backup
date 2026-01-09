@@ -21,37 +21,38 @@ func (p *ServerProvider) Type() string {
 	return "server"
 }
 
-// Backup 执行服务器备份（导入到目标服务器）
-func (p *ServerProvider) Backup(ctx BackupContext) error {
+// Backup 执行服务器备份（导入到目标服务器），返回目标服务器信息
+func (p *ServerProvider) Backup(ctx BackupContext) (string, error) {
 	dest := ctx.Destination
 
 	if dest.TargetServerID == nil {
-		return fmt.Errorf("target server id is nil")
+		return "", fmt.Errorf("target server id is nil")
 	}
 
 	var targetServer model.ServerConfig
 	if err := database.DB.First(&targetServer, *dest.TargetServerID).Error; err != nil {
-		return fmt.Errorf("failed to get target server: %w", err)
+		return "", fmt.Errorf("failed to get target server: %w", err)
 	}
 
 	client := bitwarden.NewClient()
 	if err := client.ConfigServer(targetServer.ServerURL); err != nil {
-		return fmt.Errorf("failed to config target server: %w", err)
+		return "", fmt.Errorf("failed to config target server: %w", err)
 	}
 
 	if err := client.Login(targetServer.ClientID, targetServer.ClientSecret); err != nil {
-		return fmt.Errorf("failed to login to target: %w", err)
+		return "", fmt.Errorf("failed to login to target: %w", err)
 	}
 
 	if err := client.Unlock(targetServer.MasterPassword); err != nil {
-		return fmt.Errorf("failed to unlock target: %w", err)
+		return "", fmt.Errorf("failed to unlock target: %w", err)
 	}
 
 	if err := client.Import(ctx.SourceFile, "json"); err != nil {
 		client.Logout()
-		return fmt.Errorf("failed to import: %w", err)
+		return "", fmt.Errorf("failed to import: %w", err)
 	}
 
 	client.Logout()
-	return nil
+	// 返回目标服务器信息
+	return fmt.Sprintf("server://%s", targetServer.Name), nil
 }

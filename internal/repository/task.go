@@ -62,6 +62,10 @@ func (r *TaskRepository) Update(task *model.BackupTask) error {
 	return r.db.Save(task).Error
 }
 
+func (r *TaskRepository) UpdateEnabled(id uint, enabled bool) error {
+	return r.db.Model(&model.BackupTask{}).Where("id = ?", id).Update("enabled", enabled).Error
+}
+
 func (r *TaskRepository) UpdateWithDestinations(task *model.BackupTask, destinationIDs []uint) error {
 	// 开启事务
 	return r.db.Transaction(func(tx *gorm.DB) error {

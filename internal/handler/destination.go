@@ -68,42 +68,53 @@ func UpdateDestination(c *gin.Context) {
 		return
 	}
 
-	// 获取现有记录
-	existing, err := destinationSvc.GetByID(uint(id))
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Destination not found"})
-		return
-	}
+	// 判断是否仅更新 enabled 状态（前端 toggle 只传 enabled 字段）
+	isToggleOnly := req.Name == "" && req.Type == ""
 
-	// 更新非敏感字段
-	existing.Name = req.Name
-	existing.Type = req.Type
-	existing.LocalPath = req.LocalPath
-	existing.WebDAVURL = req.WebDAVURL
-	existing.WebDAVUsername = req.WebDAVUsername
-	existing.WebDAVPath = req.WebDAVPath
-	existing.S3Endpoint = req.S3Endpoint
-	existing.S3Region = req.S3Region
-	existing.S3Bucket = req.S3Bucket
-	existing.S3AccessKey = req.S3AccessKey
-	existing.S3Path = req.S3Path
-	existing.TargetServerID = req.TargetServerID
-	existing.Encrypted = req.Encrypted
+	if isToggleOnly {
+		if err := destinationSvc.UpdateEnabled(uint(id), req.Enabled); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	} else {
+		// 获取现有记录
+		existing, err := destinationSvc.GetByID(uint(id))
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Destination not found"})
+			return
+		}
 
-	// 敏感字段：空值不更新
-	if req.WebDAVPassword != "" {
-		existing.WebDAVPassword = req.WebDAVPassword
-	}
-	if req.S3SecretKey != "" {
-		existing.S3SecretKey = req.S3SecretKey
-	}
-	if req.EncryptionPassword != "" {
-		existing.EncryptionPassword = req.EncryptionPassword
-	}
+		// 更新非敏感字段
+		existing.Name = req.Name
+		existing.Type = req.Type
+		existing.LocalPath = req.LocalPath
+		existing.WebDAVURL = req.WebDAVURL
+		existing.WebDAVUsername = req.WebDAVUsername
+		existing.WebDAVPath = req.WebDAVPath
+		existing.S3Endpoint = req.S3Endpoint
+		existing.S3Region = req.S3Region
+		existing.S3Bucket = req.S3Bucket
+		existing.S3AccessKey = req.S3AccessKey
+		existing.S3Path = req.S3Path
+		existing.TargetServerID = req.TargetServerID
+		existing.Encrypted = req.Encrypted
+		existing.Enabled = req.Enabled
 
-	if err := destinationSvc.Update(uint(id), existing); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		// 敏感字段：空值不更新
+		if req.WebDAVPassword != "" {
+			existing.WebDAVPassword = req.WebDAVPassword
+		}
+		if req.S3SecretKey != "" {
+			existing.S3SecretKey = req.S3SecretKey
+		}
+		if req.EncryptionPassword != "" {
+			existing.EncryptionPassword = req.EncryptionPassword
+		}
+
+		if err := destinationSvc.Update(uint(id), existing); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
 	// 重新获取更新后的数据

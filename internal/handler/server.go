@@ -87,33 +87,43 @@ func UpdateServer(c *gin.Context) {
 		return
 	}
 
-	// 获取现有记录
-	existing, err := serverSvc.GetByID(uint(id))
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Server not found"})
-		return
-	}
+	// 判断是否仅更新 enabled 状态
+	isToggleOnly := req.Enabled != nil && req.Name == "" && req.ServerURL == "" && req.ClientID == ""
 
-	// 更新非敏感字段
-	existing.Name = req.Name
-	existing.ServerURL = req.ServerURL
-	existing.ClientID = req.ClientID
-	existing.IsOfficial = req.IsOfficial
-	if req.Enabled != nil {
-		existing.Enabled = *req.Enabled
-	}
+	if isToggleOnly {
+		if err := serverSvc.UpdateEnabled(uint(id), *req.Enabled); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	} else {
+		// 获取现有记录
+		existing, err := serverSvc.GetByID(uint(id))
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Server not found"})
+			return
+		}
 
-	// 敏感字段：空值不更新
-	if req.ClientSecret != "" {
-		existing.ClientSecret = req.ClientSecret
-	}
-	if req.MasterPassword != "" {
-		existing.MasterPassword = req.MasterPassword
-	}
+		// 更新非敏感字段
+		existing.Name = req.Name
+		existing.ServerURL = req.ServerURL
+		existing.ClientID = req.ClientID
+		existing.IsOfficial = req.IsOfficial
+		if req.Enabled != nil {
+			existing.Enabled = *req.Enabled
+		}
 
-	if err := serverSvc.Update(uint(id), existing); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		// 敏感字段：空值不更新
+		if req.ClientSecret != "" {
+			existing.ClientSecret = req.ClientSecret
+		}
+		if req.MasterPassword != "" {
+			existing.MasterPassword = req.MasterPassword
+		}
+
+		if err := serverSvc.Update(uint(id), existing); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
 	// 重新获取更新后的数据

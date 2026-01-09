@@ -5,12 +5,12 @@ import (
 	"github.com/mingzaily/bitwarden-backup/internal/provider"
 )
 
-func (s *Scheduler) backupToDestination(dest model.BackupDestination, sourceFile, taskName, timestamp string) error {
+func (s *Scheduler) backupToDestination(dest model.BackupDestination, sourceFile, taskName, timestamp string) (string, error) {
 	registry := provider.GetRegistry()
 
 	p, err := registry.Get(dest.Type)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	ctx := provider.BackupContext{

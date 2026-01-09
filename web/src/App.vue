@@ -40,6 +40,18 @@
 
     <!-- Toast Container -->
     <ToastContainer ref="toastRef" />
+
+    <!-- Confirm Modal -->
+    <ConfirmModal
+      :visible="confirmState.visible"
+      :title="confirmState.title"
+      :message="confirmState.message"
+      :type="confirmState.type"
+      :confirm-text="confirmState.confirmText"
+      :cancel-text="confirmState.cancelText"
+      @confirm="handleConfirm"
+      @cancel="handleCancel"
+    />
     </div>
   </div>
 </template>
@@ -47,7 +59,11 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import ToastContainer from '@/components/ui/ToastContainer.vue'
+import ConfirmModal from '@/components/ui/ConfirmModal.vue'
 import { setToastInstance } from '@/composables/useToast'
+import { useConfirm } from '@/composables/useConfirm'
+
+const { state: confirmState, handleConfirm, handleCancel } = useConfirm()
 
 const tabs = ref([
   { path: '/servers', label: '服务器列表' },

@@ -33,6 +33,10 @@ func (r *ServerRepository) Update(server *model.ServerConfig) error {
 	return r.db.Save(server).Error
 }
 
+func (r *ServerRepository) UpdateEnabled(id uint, enabled bool) error {
+	return r.db.Model(&model.ServerConfig{}).Where("id = ?", id).Update("enabled", enabled).Error
+}
+
 func (r *ServerRepository) Delete(id uint) error {
 	return r.db.Delete(&model.ServerConfig{}, id).Error
 }

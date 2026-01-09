@@ -122,9 +122,11 @@
 import { ref, onMounted } from 'vue'
 import { serversApi } from '@/api'
 import { useToast } from '@/composables/useToast'
+import { useConfirm } from '@/composables/useConfirm'
 import ServerModal from '@/components/features/Server/ServerModal.vue'
 
 const toast = useToast()
+const { confirm } = useConfirm()
 const servers = ref([])
 const loading = ref(false)
 const showModal = ref(false)
@@ -171,7 +173,13 @@ const toggleServer = async (id, enabled) => {
 }
 
 const deleteServer = async (id) => {
-  if (!confirm('确定要删除这个服务器吗？')) return
+  const confirmed = await confirm({
+    title: '删除服务器',
+    message: '确定要删除这个服务器吗？此操作不可恢复。',
+    type: 'danger',
+    confirmText: '删除'
+  })
+  if (!confirmed) return
 
   try {
     await serversApi.delete(id)

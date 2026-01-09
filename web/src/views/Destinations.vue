@@ -117,9 +117,11 @@
 import { ref, onMounted } from 'vue'
 import { destinationsApi } from '@/api'
 import { useToast } from '@/composables/useToast'
+import { useConfirm } from '@/composables/useConfirm'
 import DestinationModal from '@/components/features/Destination/DestinationModal.vue'
 
 const toast = useToast()
+const { confirm } = useConfirm()
 const destinations = ref([])
 const loading = ref(false)
 const showModal = ref(false)
@@ -195,7 +197,13 @@ const toggleDestination = async (id, enabled) => {
 }
 
 const deleteDestination = async (id) => {
-  if (!confirm('确定要删除这个备份目标吗？')) return
+  const confirmed = await confirm({
+    title: '删除备份目标',
+    message: '确定要删除这个备份目标吗？此操作不可恢复。',
+    type: 'danger',
+    confirmText: '删除'
+  })
+  if (!confirmed) return
 
   try {
     await destinationsApi.delete(id)
