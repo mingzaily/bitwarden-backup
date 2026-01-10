@@ -3,7 +3,7 @@ package database
 import (
 	"encoding/base64"
 	"fmt"
-	"log"
+	"github.com/mingzaily/bitwarden-backup/internal/logger"
 
 	"github.com/mingzaily/bitwarden-backup/internal/crypto"
 	"github.com/mingzaily/bitwarden-backup/internal/model"
@@ -11,7 +11,7 @@ import (
 )
 
 func MigrateEncryptExistingData() error {
-	log.Println("Starting migration: encrypting existing sensitive data...")
+	logger.Module(logger.ModuleDatabase).Info("Starting migration: encrypting existing sensitive data...")
 
 	if err := migrateServerConfigs(); err != nil {
 		return fmt.Errorf("failed to migrate server configs: %w", err)
@@ -21,7 +21,7 @@ func MigrateEncryptExistingData() error {
 		return fmt.Errorf("failed to migrate backup destinations: %w", err)
 	}
 
-	log.Println("Migration completed successfully")
+	logger.Module(logger.ModuleDatabase).Info("Migration completed successfully")
 	return nil
 }
 
@@ -32,7 +32,7 @@ func migrateServerConfigs() error {
 		return err
 	}
 
-	log.Printf("Found %d server configs to migrate", len(servers))
+	logger.Module(logger.ModuleDatabase).Info("Found server configs to migrate", "count", len(servers))
 
 	for i := range servers {
 		server := &servers[i]
@@ -69,7 +69,7 @@ func migrateServerConfigs() error {
 			if err := DB.Session(&gorm.Session{SkipHooks: true}).Save(server).Error; err != nil {
 				return fmt.Errorf("failed to save server %d: %w", server.ID, err)
 			}
-			log.Printf("Migrated server config ID: %d", server.ID)
+			logger.Module(logger.ModuleDatabase).Info("Migrated server config", "id", server.ID)
 		}
 	}
 
@@ -83,7 +83,7 @@ func migrateBackupDestinations() error {
 		return err
 	}
 
-	log.Printf("Found %d backup destinations to migrate", len(destinations))
+	logger.Module(logger.ModuleDatabase).Info("Found backup destinations to migrate", "count", len(destinations))
 
 	for i := range destinations {
 		dest := &destinations[i]
@@ -102,7 +102,7 @@ func migrateBackupDestinations() error {
 			if err := DB.Session(&gorm.Session{SkipHooks: true}).Save(dest).Error; err != nil {
 				return fmt.Errorf("failed to save destination %d: %w", dest.ID, err)
 			}
-			log.Printf("Migrated backup destination ID: %d", dest.ID)
+			logger.Module(logger.ModuleDatabase).Info("Migrated backup destination", "id", dest.ID)
 		}
 	}
 

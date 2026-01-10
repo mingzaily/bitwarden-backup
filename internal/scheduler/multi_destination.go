@@ -1,15 +1,16 @@
 package scheduler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/mingzaily/bitwarden-backup/internal/bitwarden"
 	"github.com/mingzaily/bitwarden-backup/internal/database"
+	"github.com/mingzaily/bitwarden-backup/internal/logger"
 	"github.com/mingzaily/bitwarden-backup/internal/model"
 )
 
@@ -42,25 +43,34 @@ func (s *Scheduler) performBackupToDestinations(task model.BackupTask, backupLog
 	}()
 
 	client.AddLog(fmt.Sprintf("Executing task: %s", task.Name))
-	_ = client.Logout()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	_ = client.Logout(ctx)
 
-	if err := client.ConfigServer(sourceServer.ServerURL); err != nil {
+	if err := client.ConfigServer(ctx, sourceServer.ServerURL); err != nil {
 		return fmt.Errorf("failed to config server: %w", err)
 	}
 
-	if err := client.Login(sourceServer.ClientID, sourceServer.ClientSecret); err != nil {
+	if err := client.Login(ctx, sourceServer.ClientID, sourceServer.ClientSecret); err != nil {
 		return fmt.Errorf("failed to login: %w", err)
 	}
 
-	if err := client.Unlock(sourceServer.MasterPassword); err != nil {
+	if err := client.Sync(ctx); err != nil {
+		return fmt.Errorf("failed to sync: %w", err)
+	}
+
+	if err := client.Unlock(ctx, sourceServer.MasterPassword); err != nil {
 		// 检测登录状态损坏，尝试重新登录
 		if _, ok := err.(*bitwarden.ErrNotLoggedIn); ok {
-			log.Printf("Login state corrupted, retrying login...")
-			_ = client.Logout()
-			if err := client.Login(sourceServer.ClientID, sourceServer.ClientSecret); err != nil {
+			logger.Module(logger.ModuleScheduler).Info("Login state corrupted, retrying login...")
+			_ = client.Logout(ctx)
+			if err := client.Login(ctx, sourceServer.ClientID, sourceServer.ClientSecret); err != nil {
 				return fmt.Errorf("failed to re-login: %w", err)
 			}
-			if err := client.Unlock(sourceServer.MasterPassword); err != nil {
+			if err := client.Sync(ctx); err != nil {
+				return fmt.Errorf("failed to sync after re-login: %w", err)
+			}
+			if err := client.Unlock(ctx, sourceServer.MasterPassword); err != nil {
 				return fmt.Errorf("failed to unlock after re-login: %w", err)
 			}
 		} else {
@@ -99,8 +109,8 @@ func (s *Scheduler) performBackupToDestinations(task model.BackupTask, backupLog
 	var plainFile string
 	if needPlain {
 		plainFile = filepath.Join(getTempDir(), fmt.Sprintf("backup_%s_%s.json", task.Name, timestamp))
-		if err := client.Export(plainFile, "json"); err != nil {
-			client.Logout()
+		if err := client.Export(ctx, plainFile, "json"); err != nil {
+			client.Logout(ctx)
 			return fmt.Errorf("failed to export: %w", err)
 		}
 		tempFiles = append(tempFiles, plainFile)
@@ -109,8 +119,8 @@ func (s *Scheduler) performBackupToDestinations(task model.BackupTask, backupLog
 	var encryptedFile string
 	if needEncrypted {
 		encryptedFile = filepath.Join(getTempDir(), fmt.Sprintf("backup_%s_%s_encrypted.json", task.Name, timestamp))
-		if err := client.Export(encryptedFile, "encrypted_json", encryptionPassword); err != nil {
-			client.Logout()
+		if err := client.Export(ctx, encryptedFile, "encrypted_json", encryptionPassword); err != nil {
+			client.Logout(ctx)
 			return fmt.Errorf("failed to export encrypted: %w", err)
 		}
 		tempFiles = append(tempFiles, encryptedFile)
@@ -129,7 +139,7 @@ func (s *Scheduler) performBackupToDestinations(task model.BackupTask, backupLog
 
 		targetPath, err := s.backupToDestination(dest, sourceFile, task.Name, timestamp)
 		if err != nil {
-			log.Printf("Failed to backup to destination %s: %v", dest.Name, err)
+			logger.Module(logger.ModuleScheduler).Error("Failed to backup to destination", "destination", dest.Name, "error", err)
 		} else if targetPath != "" {
 			backupPaths = append(backupPaths, targetPath)
 		}
@@ -142,11 +152,11 @@ func (s *Scheduler) performBackupToDestinations(task model.BackupTask, backupLog
 
 	for _, f := range tempFiles {
 		if err := os.Remove(f); err != nil {
-			log.Printf("Failed to remove temp file %s: %v", f, err)
+			logger.Module(logger.ModuleScheduler).Warn("Failed to remove temp file", "file", f, "error", err)
 		}
 	}
 
-	client.Logout()
+	client.Logout(ctx)
 
 	return nil
 }

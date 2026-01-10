@@ -1,0 +1,11 @@
+{
+  "id": 18,
+  "task_id": 1,
+  "status": "failed",
+  "message": "failed to unlock: unlock returned empty session token (exit=0); stdout= stderr=",
+  "backup_file": "",
+  "execution_logs": "[{\"time\":\"2026/01/11 00:50:00\",\"message\":\"Executing task: 每3分钟\"},{\"time\":\"2026/01/11 00:50:02\",\"message\":\"bw logout (exit=0)\"},{\"time\":\"2026/01/11 00:50:03\",\"message\":\"bw config server https://vaultwarden.mingzaily.com/ (exit=0)\"},{\"time\":\"2026/01/11 00:50:05\",\"message\":\"bw login --apikey (exit=0)\"},{\"time\":\"2026/01/11 00:50:07\",\"message\":\"bw status (exit=0)\"},{\"time\":\"2026/01/11 00:50:07\",\"message\":\"bw status stdout: {\\\"serverUrl\\\":\\\"https://vaultwarden.mingzaily.com\\\",\\\"lastSync\\\":null,\\\"userEmail\\\":\\\"mingzaily@qq.com\\\",\\\"userId\\\":\\\"cbdbcd1c-9da0-45da-826e-1160d1e23124\\\",\\\"status\\\":\\\"locked\\\"}\"},{\"time\":\"2026/01/11 00:50:10\",\"message\":\"bw unlock --raw --passwordenv BW_PASSWORD --nointeraction (exit=0)\"},{\"time\":\"2026/01/11 00:50:12\",\"message\":\"bw status (exit=0)\"},{\"time\":\"2026/01/11 00:50:12\",\"message\":\"bw status stdout: {\\\"serverUrl\\\":\\\"https://vaultwarden.mingzaily.com\\\",\\\"lastSync\\\":null,\\\"userEmail\\\":\\\"mingzaily@qq.com\\\",\\\"userId\\\":\\\"cbdbcd1c-9da0-45da-826e-1160d1e23124\\\",\\\"status\\\":\\\"locked\\\"}\"},{\"time\":\"2026/01/11 00:50:12\",\"message\":\"ERROR: unlock returned empty session token (exit=0); stdout= stderr=\"}]",
+  "start_time": "2026-01-11T00:50:00.0005096+08:00",
+  "end_time": "2026-01-11T00:50:12.1722916+08:00",
+  "created_at": "2026-01-11T00:50:00.0005096+08:00"
+}

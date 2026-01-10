@@ -168,6 +168,20 @@ docker compose logs -f
 - 敏感字段通过 `BeforeSave`/`AfterFind` 钩子自动加密/解密
 - 外键关系使用 `gorm:"foreignKey"` 显式声明
 
+### 日志规范
+- 使用 `log/slog` 标准库进行结构化日志记录
+- 日志调用使用键值对格式：`logger.Info(msg, key1, value1, key2, value2, ...)`
+- 禁止使用 `fmt.Printf` 风格的格式化字符串（`%s`、`%d` 等）
+- 模块标识使用独立的 `module` 字段，而非消息前缀
+- 示例：
+  ```go
+  // 正确
+  logger.Info("Master key loaded", "module", "encryption", "file", path)
+
+  // 错误
+  logger.Info("[encryption] Master key loaded from %s", path)
+  ```
+
 ---
 
 ## AI 使用指引

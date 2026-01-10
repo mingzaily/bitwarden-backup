@@ -9,7 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"github.com/mingzaily/bitwarden-backup/internal/logger"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -31,7 +31,7 @@ func InitEncryption() error {
 	// 1. 首先检查环境变量
 	masterKey := os.Getenv("BITWARDEN_BACKUP_MASTER_KEY")
 	if masterKey != "" {
-		log.Println("[encryption] Master key loaded from environment variable")
+		logger.Module(logger.ModuleEncryption).Info("Master key loaded from environment variable")
 		return deriveEncryptionKey(masterKey)
 	}
 
@@ -39,7 +39,7 @@ func InitEncryption() error {
 	dataEnvPath := "data/.env"
 	masterKey, err := loadKeyFromEnvFile(dataEnvPath)
 	if err == nil && masterKey != "" {
-		log.Printf("[encryption] Master key loaded from %s file", dataEnvPath)
+		logger.Module(logger.ModuleEncryption).Info("Master key loaded from file", "file", dataEnvPath)
 		return deriveEncryptionKey(masterKey)
 	}
 
@@ -47,19 +47,19 @@ func InitEncryption() error {
 	envPath := ".env"
 	masterKey, err = loadKeyFromEnvFile(envPath)
 	if err == nil && masterKey != "" {
-		log.Printf("[encryption] Master key loaded from %s file", envPath)
+		logger.Module(logger.ModuleEncryption).Info("Master key loaded from file", "file", envPath)
 		return deriveEncryptionKey(masterKey)
 	}
 
 	// 4. 生成新密钥并保存到 data/.env（优先）或 .env
-	log.Println("[encryption] No master key found, generating new key...")
+	logger.Module(logger.ModuleEncryption).Info("No master key found, generating new key")
 
 	// 确保 data 目录存在
 	if err := os.MkdirAll("data", 0755); err == nil {
 		masterKey, err = generateAndSaveKey(dataEnvPath)
 		if err == nil {
-			log.Printf("[encryption] New master key generated and saved to %s", dataEnvPath)
-			log.Println("[encryption] Key is persisted in data/ directory")
+			logger.Module(logger.ModuleEncryption).Info("New master key generated and saved", "file", dataEnvPath)
+			logger.Module(logger.ModuleEncryption).Info("Key is persisted in data/ directory")
 			return deriveEncryptionKey(masterKey)
 		}
 	}
@@ -70,8 +70,8 @@ func InitEncryption() error {
 		return fmt.Errorf("failed to generate and save master key: %w", err)
 	}
 
-	log.Printf("[encryption] New master key generated and saved to %s", envPath)
-	log.Println("[encryption] ⚠️  IMPORTANT: Backup this .env file!")
+	logger.Module(logger.ModuleEncryption).Info("New master key generated and saved", "file", envPath)
+	logger.Module(logger.ModuleEncryption).Info("IMPORTANT: Backup this .env file!")
 
 	return deriveEncryptionKey(masterKey)
 }

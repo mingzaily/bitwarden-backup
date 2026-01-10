@@ -2,7 +2,7 @@ package scheduler
 
 import (
 	"fmt"
-	"log"
+	"github.com/mingzaily/bitwarden-backup/internal/logger"
 	"strings"
 	"time"
 
@@ -35,7 +35,7 @@ func (s *Scheduler) AddTask(task model.BackupTask) error {
 	s.taskEntries[task.ID] = entryID
 	s.mu.Unlock()
 
-	log.Printf("Task %s (ID:%d) added with cron: %s", task.Name, task.ID, task.CronExpression)
+	logger.Module(logger.ModuleScheduler).Info("Task added", "name", task.Name, "id", task.ID, "cron", task.CronExpression)
 	return nil
 }
 
@@ -47,7 +47,7 @@ func (s *Scheduler) RemoveTask(taskID uint) {
 	if entryID, exists := s.taskEntries[taskID]; exists {
 		s.cron.Remove(entryID)
 		delete(s.taskEntries, taskID)
-		log.Printf("Task ID:%d removed from scheduler", taskID)
+		logger.Module(logger.ModuleScheduler).Info("Task removed from scheduler", "taskID", taskID)
 	}
 }
 
@@ -58,8 +58,7 @@ func (s *Scheduler) UpdateTask(task model.BackupTask) error {
 
 	// 如果任务禁用或没有cron表达式，不重新添加
 	if !task.Enabled || task.CronExpression == "" {
-		log.Printf("Task %s (ID:%d) not scheduled (enabled=%v, cron=%s)",
-			task.Name, task.ID, task.Enabled, task.CronExpression)
+		logger.Module(logger.ModuleScheduler).Info("Task not scheduled", "name", task.Name, "id", task.ID, "enabled", task.Enabled, "cron", task.CronExpression)
 		return nil
 	}
 
@@ -68,7 +67,7 @@ func (s *Scheduler) UpdateTask(task model.BackupTask) error {
 }
 
 func (s *Scheduler) executeTask(task model.BackupTask) {
-	log.Printf("Executing task: %s", task.Name)
+	logger.Module(logger.ModuleScheduler).Info("Executing task", "name", task.Name)
 
 	startTime := time.Now()
 	backupLog := model.BackupLog{
@@ -79,7 +78,7 @@ func (s *Scheduler) executeTask(task model.BackupTask) {
 	database.DB.Create(&backupLog)
 
 	if err := s.performBackup(task, &backupLog); err != nil {
-		log.Printf("Task %s failed: %v", task.Name, err)
+		logger.Module(logger.ModuleScheduler).Error("Task failed", "name", task.Name, "error", err)
 		endTime := time.Now()
 		backupLog.Status = "failed"
 		backupLog.Message = err.Error()
@@ -93,5 +92,5 @@ func (s *Scheduler) executeTask(task model.BackupTask) {
 	backupLog.Message = "Backup completed successfully"
 	backupLog.EndTime = &endTime
 	database.DB.Save(&backupLog)
-	log.Printf("Task %s completed successfully", task.Name)
+	logger.Module(logger.ModuleScheduler).Info("Task completed successfully", "name", task.Name)
 }

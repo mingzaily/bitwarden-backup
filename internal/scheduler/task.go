@@ -2,9 +2,9 @@ package scheduler
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/mingzaily/bitwarden-backup/internal/database"
+	"github.com/mingzaily/bitwarden-backup/internal/logger"
 	"github.com/mingzaily/bitwarden-backup/internal/model"
 )
 
@@ -19,18 +19,18 @@ func (s *Scheduler) LoadTasks() error {
 
 	for _, task := range tasks {
 		if task.CronExpression == "" {
-			log.Printf("Skipping manual task: %s (no cron expression)", task.Name)
+			logger.Module(logger.ModuleScheduler).Debug("Skipping manual task", "task", task.Name, "reason", "no cron expression")
 			manualCount++
 			continue
 		}
 
 		if err := s.AddTask(task); err != nil {
-			log.Printf("Failed to add task %s: %v", task.Name, err)
+			logger.Module(logger.ModuleScheduler).Error("Failed to add task", "task", task.Name, "error", err)
 		} else {
 			scheduledCount++
 		}
 	}
 
-	log.Printf("Loaded %d scheduled tasks, %d manual tasks", scheduledCount, manualCount)
+	logger.Module(logger.ModuleScheduler).Info("Tasks loaded", "scheduled", scheduledCount, "manual", manualCount)
 	return nil
 }

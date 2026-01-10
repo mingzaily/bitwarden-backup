@@ -1,43 +1,28 @@
 package bitwarden
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 )
 
-// passwordPromptRegex 匹配密码提示信息
-var passwordPromptRegex = regexp.MustCompile(`\?\s*Master password:\s*(\[input is hidden\]|\[hidden\])\s*`)
-
-// cleanPasswordPrompts 清理 stderr 中的密码提示信息
-func cleanPasswordPrompts(s string) string {
-	// 移除所有密码提示
-	cleaned := passwordPromptRegex.ReplaceAllString(s, "")
-	// 清理多余的空白
-	cleaned = strings.TrimSpace(cleaned)
-	// 如果清理后只剩空白，返回空字符串
-	if cleaned == "" {
-		return ""
-	}
-	return cleaned
-}
-
 // Unlock 解锁密码库
-func (c *Client) Unlock(masterPassword string) error {
-	if status, err := c.Status(); err == nil {
+func (c *Client) Unlock(ctx context.Context, masterPassword string) error {
+	if status, err := c.Status(ctx); err == nil {
 		if status == "unauthenticated" {
 			return fmt.Errorf("bw status is unauthenticated; login required before unlock")
 		}
 	}
 
-	stdin := masterPassword
-	if !strings.HasSuffix(stdin, "\n") {
-		stdin += "\n"
+	// 使用环境变量传递密码，避免交互式输入的偶发问题
+	// --passwordenv: 从环境变量读取密码
+	// --nointeraction: 禁用交互式提示，失败时直接返回非零退出码
+	extraEnv := map[string]string{
+		"BW_PASSWORD": masterPassword,
 	}
-
-	res, err := c.runBW([]string{"unlock", "--raw"}, stdin, nil)
+	res, err := c.runBW(ctx, []string{"unlock", "--raw", "--passwordenv", "BW_PASSWORD", "--nointeraction"}, "", extraEnv)
 	stderr := strings.TrimSpace(res.Stderr)
 	// 清理 stderr 中的密码提示信息，只保留有意义的错误信息
 	if stderr != "" {
@@ -62,18 +47,23 @@ func (c *Client) Unlock(masterPassword string) error {
 	token := strings.TrimSpace(res.Stdout)
 	if token == "" {
 		stdout := strings.TrimSpace(res.Stdout)
+		stderr := strings.TrimSpace(res.Stderr)
+
 		if stdout != "" {
 			c.AddLog(fmt.Sprintf("bw unlock stdout: %s", stdout))
 		}
 
 		// 二次预检：若 vault 已是 unlocked，则允许继续（无需 session）
-		if status, serr := c.Status(); serr == nil && status == "unlocked" {
+		if status, serr := c.Status(ctx); serr == nil && status == "unlocked" {
 			c.vaultUnlocked = true
 			c.sessionToken = ""
 			return nil
 		}
 
-		return fmt.Errorf("unlock returned empty session token (exit=%d); stdout=%s stderr=%s", res.ExitCode, strings.TrimSpace(res.Stdout), strings.TrimSpace(res.Stderr))
+		// 记录错误到日志
+		errMsg := fmt.Sprintf("unlock returned empty session token (exit=%d); stdout=%s stderr=%s", res.ExitCode, stdout, stderr)
+		c.AddLog(fmt.Sprintf("ERROR: %s", errMsg))
+		return fmt.Errorf(errMsg)
 	}
 
 	c.sessionToken = token
@@ -93,7 +83,7 @@ func (e *ErrNotLoggedIn) Error() string {
 
 // Export 导出密码库数据
 // password 参数为可选，仅在 format 为 "encrypted_json" 时需要提供
-func (c *Client) Export(outputPath, format string, password ...string) error {
+func (c *Client) Export(ctx context.Context, outputPath, format string, password ...string) error {
 	if c.sessionToken == "" && !c.vaultUnlocked {
 		return fmt.Errorf("vault is not unlocked, please unlock first")
 	}
@@ -115,7 +105,7 @@ func (c *Client) Export(outputPath, format string, password ...string) error {
 		args = append(args, "--password", password[0])
 	}
 
-	res, err := c.runBW(args, "", nil)
+	res, err := c.runBW(ctx, args, "", nil)
 	if err != nil {
 		if strings.TrimSpace(res.Stdout) != "" {
 			c.AddLog(fmt.Sprintf("bw export stdout: %s", strings.TrimSpace(res.Stdout)))

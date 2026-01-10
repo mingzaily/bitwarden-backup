@@ -2,15 +2,22 @@ package bitwarden
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/mingzaily/bitwarden-backup/internal/logger"
 )
+
+// bwMu 全局互斥锁，防止并发调用 Bitwarden CLI
+var bwMu sync.Mutex
 
 // LogEntry 单条执行日志
 type LogEntry struct {
@@ -23,12 +30,16 @@ type Client struct {
 	sessionToken  string
 	serverURL     string
 	vaultUnlocked bool
+	logger        *slog.Logger
 	logs          []LogEntry
 }
 
 // NewClient 创建新的 Bitwarden 客户端
 func NewClient() *Client {
-	return &Client{logs: make([]LogEntry, 0)}
+	return &Client{
+		logger: logger.Module(logger.ModuleBitwarden),
+		logs:   make([]LogEntry, 0),
+	}
 }
 
 // ansiRegex 匹配 ANSI 转义序列
@@ -73,7 +84,7 @@ func (c *Client) AddLog(message string) {
 		Time:    time.Now().Format("2006/01/02 15:04:05"),
 		Message: cleanMessage,
 	})
-	log.Printf("[bitwarden] %s", cleanMessage)
+	c.logger.Info(cleanMessage)
 }
 
 // GetLogs 获取所有日志
@@ -115,8 +126,12 @@ func redactBWArgs(args []string) []string {
 	return redacted
 }
 
-func (c *Client) runBW(args []string, stdin string, extraEnv map[string]string) (bwExecResult, error) {
-	cmd := exec.Command("bw", args...)
+func (c *Client) runBW(ctx context.Context, args []string, stdin string, extraEnv map[string]string) (bwExecResult, error) {
+	bwMu.Lock()
+	defer bwMu.Unlock()
+
+	start := time.Now()
+	cmd := exec.CommandContext(ctx, "bw", args...)
 	cmd.Env = os.Environ()
 	for k, v := range extraEnv {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
@@ -132,6 +147,7 @@ func (c *Client) runBW(args []string, stdin string, extraEnv map[string]string) 
 	cmd.Stderr = &stderrBuf
 
 	err := cmd.Run()
+	duration := time.Since(start)
 	exitCode := 0
 	if cmd.ProcessState != nil {
 		exitCode = cmd.ProcessState.ExitCode()
@@ -145,7 +161,10 @@ func (c *Client) runBW(args []string, stdin string, extraEnv map[string]string) 
 		ExitCode: exitCode,
 	}
 
-	c.AddLog(fmt.Sprintf("bw %s (exit=%d)", strings.Join(redactBWArgs(args), " "), exitCode))
+	// 统一日志：控制台和数据库都记录同一条
+	logMsg := fmt.Sprintf("bw %s (exit=%d, %dms)", strings.Join(redactBWArgs(args), " "), exitCode, duration.Milliseconds())
+	c.logger.Info(logMsg)
+	c.AddLog(logMsg)
 	return res, err
 }
 
@@ -154,8 +173,8 @@ type bwStatusResponse struct {
 }
 
 // Status 获取当前 vault 状态（unauthenticated / locked / unlocked）
-func (c *Client) Status() (string, error) {
-	res, err := c.runBW([]string{"status"}, "", nil)
+func (c *Client) Status(ctx context.Context) (string, error) {
+	res, err := c.runBW(ctx, []string{"status"}, "", nil)
 	stdout := strings.TrimSpace(res.Stdout)
 	stderr := strings.TrimSpace(res.Stderr)
 
@@ -180,8 +199,8 @@ func (c *Client) Status() (string, error) {
 }
 
 // ConfigServer 配置服务器地址
-func (c *Client) ConfigServer(serverURL string) error {
-	res, err := c.runBW([]string{"config", "server", serverURL}, "", nil)
+func (c *Client) ConfigServer(ctx context.Context, serverURL string) error {
+	res, err := c.runBW(ctx, []string{"config", "server", serverURL}, "", nil)
 	if err != nil {
 		if strings.TrimSpace(res.Stdout) != "" {
 			c.AddLog(fmt.Sprintf("bw config server stdout: %s", strings.TrimSpace(res.Stdout)))
@@ -196,8 +215,9 @@ func (c *Client) ConfigServer(serverURL string) error {
 }
 
 // Login 登录到 Bitwarden
-func (c *Client) Login(clientID, clientSecret string) error {
+func (c *Client) Login(ctx context.Context, clientID, clientSecret string) error {
 	res, err := c.runBW(
+		ctx,
 		[]string{"login", "--apikey"},
 		"",
 		map[string]string{
@@ -213,6 +233,18 @@ func (c *Client) Login(clientID, clientSecret string) error {
 			c.AddLog(fmt.Sprintf("bw login stderr: %s", strings.TrimSpace(res.Stderr)))
 		}
 		return fmt.Errorf("login failed (exit=%d): %w", res.ExitCode, err)
+	}
+	return nil
+}
+
+// Sync 同步 vault 数据
+func (c *Client) Sync(ctx context.Context) error {
+	res, err := c.runBW(ctx, []string{"sync"}, "", nil)
+	if err != nil {
+		if strings.TrimSpace(res.Stderr) != "" {
+			c.AddLog(fmt.Sprintf("bw sync stderr: %s", strings.TrimSpace(res.Stderr)))
+		}
+		return fmt.Errorf("sync failed (exit=%d): %w", res.ExitCode, err)
 	}
 	return nil
 }

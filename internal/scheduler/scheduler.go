@@ -1,9 +1,9 @@
 package scheduler
 
 import (
-	"log"
 	"sync"
 
+	"github.com/mingzaily/bitwarden-backup/internal/logger"
 	"github.com/robfig/cron/v3"
 )
 
@@ -21,11 +21,11 @@ func New() *Scheduler {
 }
 
 func (s *Scheduler) Start() {
-	log.Println("Scheduler started")
+	logger.Module(logger.ModuleScheduler).Info("Scheduler started")
 	s.cron.Start()
 }
 
 func (s *Scheduler) Stop() {
-	log.Println("Scheduler stopped")
+	logger.Module(logger.ModuleScheduler).Info("Scheduler stopped")
 	s.cron.Stop()
 }

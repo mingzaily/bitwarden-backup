@@ -2,12 +2,12 @@ package database
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/mingzaily/bitwarden-backup/internal/config"
 	"github.com/mingzaily/bitwarden-backup/internal/crypto"
+	applogger "github.com/mingzaily/bitwarden-backup/internal/logger"
 	"github.com/mingzaily/bitwarden-backup/internal/model"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -52,7 +52,7 @@ func Init(dbPath string, cfg *config.Config) error {
 		return fmt.Errorf("failed to migrate database: %w", err)
 	}
 
-	log.Println("Database initialized successfully")
+	applogger.Module(applogger.ModuleDatabase).Info("Database initialized successfully")
 	return nil
 }
 

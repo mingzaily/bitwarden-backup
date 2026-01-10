@@ -1,7 +1,7 @@
 package scheduler
 
 import (
-	"log"
+	"github.com/mingzaily/bitwarden-backup/internal/logger"
 
 	"github.com/mingzaily/bitwarden-backup/internal/model"
 	"github.com/mingzaily/bitwarden-backup/internal/provider"
@@ -32,9 +32,9 @@ func (s *Scheduler) backupToDestination(dest model.BackupDestination, sourceFile
 		if rp, ok := p.(provider.RetentionProvider); ok {
 			deleted, cleanupErr := rp.Cleanup(dest, dest.MaxBackupCount)
 			if cleanupErr != nil {
-				log.Printf("Warning: cleanup failed for %s: %v", dest.Name, cleanupErr)
+				logger.Module(logger.ModuleScheduler).Warn("Cleanup failed", "destination", dest.Name, "error", cleanupErr)
 			} else if deleted > 0 {
-				log.Printf("Cleaned up %d old backup(s) from %s", deleted, dest.Name)
+				logger.Module(logger.ModuleScheduler).Info("Cleaned up old backups", "count", deleted, "destination", dest.Name)
 			}
 		}
 	}

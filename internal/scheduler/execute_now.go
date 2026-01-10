@@ -1,7 +1,7 @@
 package scheduler
 
 import (
-	"log"
+	"github.com/mingzaily/bitwarden-backup/internal/logger"
 	"time"
 
 	"github.com/mingzaily/bitwarden-backup/internal/database"
@@ -9,7 +9,7 @@ import (
 )
 
 func (s *Scheduler) ExecuteTaskNow(task model.BackupTask) {
-	log.Printf("Manually executing task: %s", task.Name)
+	logger.Module(logger.ModuleScheduler).Info("Manually executing task", "name", task.Name)
 
 	startTime := time.Now()
 	backupLog := model.BackupLog{
@@ -20,7 +20,7 @@ func (s *Scheduler) ExecuteTaskNow(task model.BackupTask) {
 	database.DB.Create(&backupLog)
 
 	if err := s.performBackup(task, &backupLog); err != nil {
-		log.Printf("Task %s failed: %v", task.Name, err)
+		logger.Module(logger.ModuleScheduler).Error("Task failed", "name", task.Name, "error", err)
 		endTime := time.Now()
 		backupLog.Status = "failed"
 		backupLog.Message = err.Error()
@@ -34,5 +34,5 @@ func (s *Scheduler) ExecuteTaskNow(task model.BackupTask) {
 	backupLog.Message = "Backup completed successfully"
 	backupLog.EndTime = &endTime
 	database.DB.Save(&backupLog)
-	log.Printf("Task %s completed successfully", task.Name)
+	logger.Module(logger.ModuleScheduler).Info("Task completed successfully", "name", task.Name)
 }

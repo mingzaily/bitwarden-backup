@@ -1,12 +1,13 @@
 package bitwarden
 
 import (
+	"context"
 	"fmt"
 	"strings"
 )
 
 // Import 导入数据到密码库
-func (c *Client) Import(inputPath, format string) error {
+func (c *Client) Import(ctx context.Context, inputPath, format string) error {
 	if c.sessionToken == "" && !c.vaultUnlocked {
 		return fmt.Errorf("vault is not unlocked, please unlock first")
 	}
@@ -16,7 +17,7 @@ func (c *Client) Import(inputPath, format string) error {
 		args = append(args, "--session", c.sessionToken)
 	}
 
-	res, err := c.runBW(args, "", nil)
+	res, err := c.runBW(ctx, args, "", nil)
 	if err != nil {
 		if strings.TrimSpace(res.Stdout) != "" {
 			c.AddLog(fmt.Sprintf("bw import stdout: %s", strings.TrimSpace(res.Stdout)))
@@ -31,8 +32,8 @@ func (c *Client) Import(inputPath, format string) error {
 }
 
 // Logout 登出
-func (c *Client) Logout() error {
-	res, err := c.runBW([]string{"logout"}, "", nil)
+func (c *Client) Logout(ctx context.Context) error {
+	res, err := c.runBW(ctx, []string{"logout"}, "", nil)
 	if err != nil {
 		stderr := strings.TrimSpace(res.Stderr)
 		// "You are not logged in" 意味着已经是登出状态，不算错误
