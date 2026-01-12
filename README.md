@@ -1,20 +1,21 @@
 # Bitwarden Backup
 
-自动化 Bitwarden 密码库备份和迁移工具，支持多目标备份（本地、WebDAV、目标服务器）。
+自动化 Bitwarden 密码库备份和迁移工具，支持多目标备份（本地、WebDAV、S3、目标服务器）。
 
 [![Docker Image](https://img.shields.io/docker/v/mingzaily/bitwarden-backup?label=Docker%20Hub)](https://hub.docker.com/r/mingzaily/bitwarden-backup)
 [![Docker Pulls](https://img.shields.io/docker/pulls/mingzaily/bitwarden-backup)](https://hub.docker.com/r/mingzaily/bitwarden-backup)
+[![License](https://img.shields.io/github/license/mingzaily/bitwarden-backup)](LICENSE)
 
 ## 功能特性
 
-- 定时自动备份（支持 Cron 表达式）
-- 多备份目标支持：本地存储、WebDAV、S3、目标服务器
-- Web 管理界面
-- 支持多源服务器配置
-- 备份历史和日志查看
-- 远程备份后自动清理临时文件
-- AES-256-GCM 加密保护敏感凭证
-- 多架构支持（amd64/arm64）
+- 🕐 定时自动备份（支持 5/6 位 Cron 表达式）
+- 📦 多备份目标支持：本地存储、WebDAV、S3 兼容存储、目标服务器迁移
+- 🖥️ Web 管理界面（Brutalist 风格 UI）
+- 🔄 支持多源服务器配置
+- 📊 备份历史和日志查看（支持分页）
+- 🧹 自动清理：临时文件清理 + 备份保留策略
+- 🔐 AES-256-GCM 加密保护敏感凭证
+- 🐳 多架构 Docker 镜像（amd64/arm64）
 
 ## ⚠️ 安全提示
 
@@ -79,7 +80,10 @@ go build -o bitwarden-backup ./cmd/server
 ./bitwarden-backup
 ```
 
-**前置要求**：Go 1.23+、Node.js 20+、[Bitwarden CLI](https://bitwarden.com/help/cli/)
+**前置要求**：
+- Go 1.23+
+- Node.js 20+
+- [Bitwarden CLI](https://bitwarden.com/help/cli/)（需全局安装：`npm install -g @bitwarden/cli`）
 
 ## 配置说明
 
@@ -133,9 +137,27 @@ go build -o bitwarden-backup ./cmd/server
 
 ```
 /app/
-├── data/       # 数据库文件
+├── data/       # 数据库文件和密钥
 ├── backups/    # 本地备份文件
 └── .tmp/       # 临时文件（自动清理）
+```
+
+## 技术栈
+
+- **后端**: Go 1.23, Gin, GORM, SQLite
+- **前端**: Vue 3, Vite, Tailwind CSS
+- **调度**: robfig/cron（支持秒级调度）
+- **加密**: AES-256-GCM + PBKDF2
+
+## 开发
+
+```bash
+# 开发模式（前端热重载 + 后端）
+cd web && npm run dev &
+go run ./cmd/server
+
+# 或使用开发脚本
+./dev.sh
 ```
 
 ## License
