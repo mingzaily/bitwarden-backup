@@ -71,10 +71,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v${{ steps.version.outputs.version }}" \
-            --title "v${{ steps.version.outputs.version }}" \
-            --generate-notes \
-            --notes-start-tag "${{ steps.version.outputs.previous_tag }}"
+          if [ "${{ steps.version.outputs.previous_tag }}" = "v0.0.0" ]; then
+            # 首次发布，不指定 previous tag
+            gh release create "v${{ steps.version.outputs.version }}" \
+              --title "v${{ steps.version.outputs.version }}" \
+              --generate-notes
+          else
+            gh release create "v${{ steps.version.outputs.version }}" \
+              --title "v${{ steps.version.outputs.version }}" \
+              --generate-notes \
+              --notes-start-tag "${{ steps.version.outputs.previous_tag }}"
+          fi
 
       - name: Append Docker Info
         env:
