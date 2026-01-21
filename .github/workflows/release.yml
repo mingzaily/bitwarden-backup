@@ -87,23 +87,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # 获取现有的 release body
-          CURRENT_BODY=$(gh release view "v${{ steps.version.outputs.version }}" --json body -q .body)
+          # 获取现有的 release body 到临时文件
+          gh release view "v${{ steps.version.outputs.version }}" --json body -q .body > /tmp/release_body.md
 
           # 追加 Docker 信息
-          NEW_BODY="${CURRENT_BODY}
+          cat >> /tmp/release_body.md << 'DOCKER_EOF'
 
 ---
 ### 🐳 Docker 镜像
 
-\`\`\`bash
+```bash
 docker pull ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
-\`\`\`
+```
 
 或使用 latest 标签：
-\`\`\`bash
+```bash
 docker pull ghcr.io/${{ github.repository }}:latest
-\`\`\`"
+```
+DOCKER_EOF
 
           # 更新 release
-          gh release edit "v${{ steps.version.outputs.version }}" --notes "$NEW_BODY"
+          gh release edit "v${{ steps.version.outputs.version }}" --notes-file /tmp/release_body.md
