@@ -20,7 +20,11 @@ RUN npm run build
 # ============================================
 # Stage 2: Backend Builder
 # ============================================
-FROM golang:1.23-alpine AS backend-builder
+FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS backend-builder
+
+# 接收目标平台参数
+ARG TARGETOS
+ARG TARGETARCH
 
 WORKDIR /build
 
@@ -35,8 +39,8 @@ RUN go mod download
 COPY . .
 
 # Build binary with optimizations
-# CGO_ENABLED=0 for pure Go SQLite (modernc.org/sqlite)
-RUN CGO_ENABLED=0 GOOS=linux go build \
+# 使用 Go 原生交叉编译，而非 QEMU 模拟
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
     -trimpath \
     -ldflags="-s -w" \
     -o bitwarden-backup \
