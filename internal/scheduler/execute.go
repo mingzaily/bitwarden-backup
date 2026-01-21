@@ -25,17 +25,7 @@ func (s *Scheduler) AddTask(task model.BackupTask) error {
 	cronExpr := normalizeCron(task.CronExpression)
 	taskID := task.ID // 只捕获任务 ID，执行时重新查询最新数据
 	entryID, err := s.cron.AddFunc(cronExpr, func() {
-		// 执行时从数据库获取最新任务配置，避免使用过期数据
-		var latestTask model.BackupTask
-		if err := database.DB.Preload("Destinations").First(&latestTask, taskID).Error; err != nil {
-			logger.Module(logger.ModuleScheduler).Error("Failed to fetch task for execution", "id", taskID, "error", err)
-			return
-		}
-		if !latestTask.Enabled {
-			logger.Module(logger.ModuleScheduler).Info("Task is disabled, skipping execution", "id", taskID, "name", latestTask.Name)
-			return
-		}
-		s.executeTask(latestTask)
+		s.enqueueTask(taskID)
 	})
 	if err != nil {
 		return fmt.Errorf("failed to add cron job: %w", err)
@@ -48,6 +38,46 @@ func (s *Scheduler) AddTask(task model.BackupTask) error {
 
 	logger.Module(logger.ModuleScheduler).Info("Task added", "name", task.Name, "id", task.ID, "cron", task.CronExpression)
 	return nil
+}
+
+func (s *Scheduler) enqueueTask(taskID uint) {
+	s.queueMu.Lock()
+	if s.queuedTasks[taskID] {
+		s.queueMu.Unlock()
+		logger.Module(logger.ModuleScheduler).Info("Task already queued, skipping", "id", taskID)
+		return
+	}
+	s.queuedTasks[taskID] = true
+	s.queueMu.Unlock()
+
+	select {
+	case s.taskQueue <- taskID:
+		logger.Module(logger.ModuleScheduler).Info("Task enqueued", "id", taskID)
+	default:
+		s.removeFromQueue(taskID)
+		logger.Module(logger.ModuleScheduler).Error("Task queue full, dropping task", "id", taskID)
+	}
+}
+
+func (s *Scheduler) processTask(taskID uint) {
+	defer s.removeFromQueue(taskID)
+
+	var latestTask model.BackupTask
+	if err := database.DB.Preload("Destinations").First(&latestTask, taskID).Error; err != nil {
+		logger.Module(logger.ModuleScheduler).Error("Failed to fetch task for execution", "id", taskID, "error", err)
+		return
+	}
+	if !latestTask.Enabled {
+		logger.Module(logger.ModuleScheduler).Info("Task is disabled, skipping execution", "id", taskID, "name", latestTask.Name)
+		return
+	}
+	s.executeTask(latestTask)
+}
+
+func (s *Scheduler) removeFromQueue(taskID uint) {
+	s.queueMu.Lock()
+	delete(s.queuedTasks, taskID)
+	s.queueMu.Unlock()
 }
 
 // RemoveTask 从调度器中移除任务
