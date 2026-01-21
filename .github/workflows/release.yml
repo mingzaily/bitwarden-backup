@@ -93,17 +93,17 @@ jobs:
           # 追加 Docker 信息
           NEW_BODY="${CURRENT_BODY}
 
-          ---
-          ### 🐳 Docker 镜像
+---
+### 🐳 Docker 镜像
 
-          \`\`\`bash
-          docker pull ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
-          \`\`\`
+\`\`\`bash
+docker pull ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
+\`\`\`
 
-          或使用 latest 标签：
-          \`\`\`bash
-          docker pull ghcr.io/${{ github.repository }}:latest
-          \`\`\`"
+或使用 latest 标签：
+\`\`\`bash
+docker pull ghcr.io/${{ github.repository }}:latest
+\`\`\`"
 
           # 更新 release
           gh release edit "v${{ steps.version.outputs.version }}" --notes "$NEW_BODY"
