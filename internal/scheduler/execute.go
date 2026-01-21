@@ -41,26 +41,37 @@ func (s *Scheduler) AddTask(task model.BackupTask) error {
 }
 
 func (s *Scheduler) enqueueTask(taskID uint) {
+	if s.stopped.Load() {
+		return
+	}
+
 	s.queueMu.Lock()
+	defer s.queueMu.Unlock()
+
+	if s.stopped.Load() {
+		return
+	}
 	if s.queuedTasks[taskID] {
-		s.queueMu.Unlock()
 		logger.Module(logger.ModuleScheduler).Info("Task already queued, skipping", "id", taskID)
 		return
 	}
-	s.queuedTasks[taskID] = true
-	s.queueMu.Unlock()
 
 	select {
 	case s.taskQueue <- taskID:
+		s.queuedTasks[taskID] = true
 		logger.Module(logger.ModuleScheduler).Info("Task enqueued", "id", taskID)
 	default:
-		s.removeFromQueue(taskID)
-		logger.Module(logger.ModuleScheduler).Error("Task queue full, dropping task", "id", taskID)
+		logger.Module(logger.ModuleScheduler).Warn("Task queue full, dropping task", "id", taskID)
 	}
 }
 
 func (s *Scheduler) processTask(taskID uint) {
 	defer s.removeFromQueue(taskID)
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Module(logger.ModuleScheduler).Error("Task execution panic recovered", "id", taskID, "panic", r)
+		}
+	}()
 
 	var latestTask model.BackupTask
 	if err := database.DB.Preload("Destinations").First(&latestTask, taskID).Error; err != nil {

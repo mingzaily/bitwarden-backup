@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mingzaily/bitwarden-backup/internal/logger"
@@ -18,6 +19,9 @@ type Scheduler struct {
 	queueMu     sync.Mutex
 	stopChan    chan struct{}
 	workerDone  chan struct{}
+	startOnce   sync.Once
+	stopOnce    sync.Once
+	stopped     atomic.Bool
 }
 
 func New() *Scheduler {
@@ -32,25 +36,38 @@ func New() *Scheduler {
 }
 
 func (s *Scheduler) Start() {
-	logger.Module(logger.ModuleScheduler).Info("Starting scheduler")
-	s.startWorker()
-	s.cron.Start()
-	logger.Module(logger.ModuleScheduler).Info("Scheduler started")
+	s.startOnce.Do(func() {
+		if s.stopped.Load() {
+			return
+		}
+		logger.Module(logger.ModuleScheduler).Info("Starting scheduler")
+		s.startWorker()
+		s.cron.Start()
+		logger.Module(logger.ModuleScheduler).Info("Scheduler started")
+	})
 }
 
 func (s *Scheduler) Stop() {
-	logger.Module(logger.ModuleScheduler).Info("Stopping scheduler")
-	s.cron.Stop()
-	close(s.stopChan)
+	s.stopOnce.Do(func() {
+		logger.Module(logger.ModuleScheduler).Info("Stopping scheduler")
 
-	select {
-	case <-s.workerDone:
-		logger.Module(logger.ModuleScheduler).Info("Worker stopped gracefully")
-	case <-time.After(30 * time.Second):
-		logger.Module(logger.ModuleScheduler).Error("Worker stop timeout")
-	}
+		// 获取锁后设置 stopped，确保与 enqueueTask 互斥
+		s.queueMu.Lock()
+		s.stopped.Store(true)
+		s.queueMu.Unlock()
 
-	logger.Module(logger.ModuleScheduler).Info("Scheduler stopped")
+		s.cron.Stop()
+		close(s.stopChan)
+
+		select {
+		case <-s.workerDone:
+			logger.Module(logger.ModuleScheduler).Info("Worker stopped gracefully")
+		case <-time.After(30 * time.Second):
+			logger.Module(logger.ModuleScheduler).Error("Worker stop timeout")
+		}
+
+		logger.Module(logger.ModuleScheduler).Info("Scheduler stopped")
+	})
 }
 
 func (s *Scheduler) startWorker() {
