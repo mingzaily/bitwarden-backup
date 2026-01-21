@@ -91,22 +91,18 @@ jobs:
         run: |
           # 获取现有的 release body 到临时文件
           gh release view "v${VERSION}" --json body -q .body > /tmp/release_body.md
-
           # 追加 Docker 信息
-          cat >> /tmp/release_body.md << EOF
-
----
-### 🐳 Docker 镜像
-
-\`\`\`bash
-docker pull ghcr.io/${REPO}:${VERSION}
-\`\`\`
-
-或使用 latest 标签：
-\`\`\`bash
-docker pull ghcr.io/${REPO}:latest
-\`\`\`
-EOF
-
+          echo "" >> /tmp/release_body.md
+          echo "---" >> /tmp/release_body.md
+          echo "### 🐳 Docker 镜像" >> /tmp/release_body.md
+          echo "" >> /tmp/release_body.md
+          echo '```bash' >> /tmp/release_body.md
+          echo "docker pull ghcr.io/${REPO}:${VERSION}" >> /tmp/release_body.md
+          echo '```' >> /tmp/release_body.md
+          echo "" >> /tmp/release_body.md
+          echo "或使用 latest 标签：" >> /tmp/release_body.md
+          echo '```bash' >> /tmp/release_body.md
+          echo "docker pull ghcr.io/${REPO}:latest" >> /tmp/release_body.md
+          echo '```' >> /tmp/release_body.md
           # 更新 release
           gh release edit "v${VERSION}" --notes-file /tmp/release_body.md
