@@ -58,17 +58,22 @@ GitHub 上大多数 Bitwarden 备份方案采用 **数据库文件备份 + rclon
 
 ### 方式一：Docker Compose（推荐）
 
-```bash
-mkdir bitwarden-backup && cd bitwarden-backup
-curl -O https://raw.githubusercontent.com/mingzaily/bitwarden-backup/master/docker-compose.yml
-```
-
-编辑 `docker-compose.yml`，配置加密密钥：
+创建 `docker-compose.yml` 文件：
 
 ```yaml
-environment:
-  - BITWARDEN_BACKUP_MASTER_KEY=your-secret-key-here  # 建议使用随机字符串
-  - TZ=Asia/Shanghai
+services:
+  bitwarden-backup:
+    image: ghcr.io/mingzaily/bitwarden-backup:latest
+    container_name: bitwarden-backup
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+      - ./backups:/app/backups
+    environment:
+      - BITWARDEN_BACKUP_MASTER_KEY=your-secret-key-here  # 建议使用随机字符串
+      - TZ=Asia/Shanghai
 ```
 
 启动服务：
