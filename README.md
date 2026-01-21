@@ -2,7 +2,7 @@
 
 自动化 Bitwarden 密码库备份和迁移工具，支持多目标备份（本地、WebDAV、S3、目标服务器）。
 
-[![GitHub Release](https://img.shields.io/github/v/release/mingzaily/bitwarden-backup)](https://github.com/mingzaily/bitwarden-backup/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/mingzaily/bitwarden-backup?include_prereleases)](https://github.com/mingzaily/bitwarden-backup/releases)
 [![Docker Image](https://ghcr-badge.egpl.dev/mingzaily/bitwarden-backup/latest_tag?trim=major&label=Docker%20Image)](https://github.com/mingzaily/bitwarden-backup/pkgs/container/bitwarden-backup)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub Stars](https://img.shields.io/github/stars/mingzaily/bitwarden-backup?style=social)](https://github.com/mingzaily/bitwarden-backup)
