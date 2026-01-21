@@ -57,15 +57,14 @@ ARG BW_CLI_VERSION=latest
 RUN npm install -g @bitwarden/cli@${BW_CLI_VERSION} && \
     npm cache clean --force
 
-# Create non-root user
-RUN addgroup -g 1000 appgroup && \
-    adduser -u 1000 -G appgroup -s /bin/sh -D appuser
+# 使用 node:alpine 内置的 node 用户 (UID 1000)
+# 无需创建新用户，直接复用
 
 WORKDIR /app
 
 # Create necessary directories
 RUN mkdir -p /app/data /app/backups /app/.tmp && \
-    chown -R appuser:appgroup /app
+    chown -R node:node /app
 
 # Copy binary from backend builder
 COPY --from=backend-builder /build/bitwarden-backup ./
@@ -74,10 +73,10 @@ COPY --from=backend-builder /build/bitwarden-backup ./
 COPY --from=frontend-builder /build/dist ./web/dist
 
 # Set ownership
-RUN chown -R appuser:appgroup /app
+RUN chown -R node:node /app
 
 # Switch to non-root user
-USER appuser
+USER node
 
 # Environment variables
 ENV SERVER_PORT=8080
