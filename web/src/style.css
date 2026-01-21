@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 强制重置 - 必须在 @layer 之外以确保优先级 */
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow-x: hidden;
+}
+
+@layer base {
+  body {
+    font-family: "Inter", sans-serif;
+  }
+}
+
+@layer components {
+  /* Brutalist Button */
+  .btn-brutalist {
+    @apply bg-brutalist-blue text-white font-bold border-2 border-black shadow-brutalist hover:shadow-brutalist-hover transition-all;
+  }
+
+  .btn-brutalist-green {
+    @apply bg-brutalist-green text-white font-bold border-2 border-black shadow-brutalist hover:shadow-brutalist-hover transition-all;
+  }
+
+  .btn-brutalist-red {
+    @apply bg-brutalist-red text-white font-bold border-2 border-black shadow-brutalist hover:shadow-brutalist-hover transition-all;
+  }
+}

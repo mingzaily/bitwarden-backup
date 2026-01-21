@@ -1,0 +1,15 @@
+services:
+  bitwarden-backup:
+    image: ghcr.io/mingzaily/bitwarden-backup:latest
+    container_name: bitwarden-backup
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+      - ./backups:/app/backups
+    environment:
+      # 可选配置，通常无需修改
+      # - SERVER_PORT=8080
+      # - DB_PATH=/app/data/bitwarden-backup.db
+      - TZ=Asia/Shanghai

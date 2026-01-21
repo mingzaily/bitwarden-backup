@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(ccg:agents:get-current-datetime)",
+      "Skill(ccg:agents:init-architect)",
+      "Bash(ace-tool enhance-prompt:*)",
+      "Bash(tree:*)",
+      "Bash(go mod tidy:*)",
+      "Bash(go build:*)",
+      "Bash(curl:*)",
+      "Bash(pkill:*)",
+      "Bash(taskkill:*)",
+      "Bash(./bitwarden-backup.exe:*)",
+      "mcp__ace-tool__search_context",
+      "mcp__ace-tool__enhance_prompt",
+      "Bash(codeagent-wrapper --backend gemini - . <<'EOF'\nROLE_FILE: ~/.claude/prompts/ccg/gemini/frontend.md\n\n<TASK>\n审查并修复以下UI问题：\n\n1. Toast通知的关闭按钮布局 - 确保只显示一个X图标，水平布局\n2. 列表样式 - 确保所有列表（destinations、servers、tasks）都使用统一的粗野风格\n3. 按钮样式 - 检查并统一所有按钮为粗野风格（border-2 border-black, shadow-brutalist）\n\n当前粗野风格设计规范：\n- 边框: border-2 border-black\n- 阴影: shadow-brutalist \\(4px 4px 0px 0px rgba\\(0, 0, 0, 1\\)\\)\n- 字体: font-black 或 font-bold\n- 颜色: brutalist-blue \\(#2563EB\\), brutalist-green \\(#10B981\\), brutalist-red \\(#EF4444\\)\n\n需要检查的文件：\n- web/static/js/toast.js \\(Toast关闭按钮\\)\n- web/templates/index.html \\(按钮样式统一\\)\n- web/static/js/destinations.js \\(列表样式\\)\n- web/static/js/servers.js \\(列表样式\\)\n- web/static/js/tasks.js \\(列表样式\\)\n</TASK>\n\nOUTPUT: Unified Diff Patch ONLY. Strictly prohibit any actual modifications.\nEOF)",
+      "Bash(chmod:*)",
+      "Bash(if [ -f \"D:/Code/bitwarden-backup/web/frontend/src/components/CustomSelect.vue\" ])",
+      "Bash(then echo \"exists\")",
+      "Bash(else echo \"not exists\")",
+      "Bash(fi)",
+      "Bash(npm run build:*)",
+      "Bash(codeagent-wrapper:*)",
+      "Bash(git reset:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(cat:*)",
+      "Bash(go get:*)"
+    ]
+  }
+}

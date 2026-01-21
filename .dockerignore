@@ -1,0 +1,49 @@
+# Git
+.git
+.gitignore
+
+# Dependencies
+web/node_modules
+
+# Build outputs
+web/dist
+bitwarden-backup
+bitwarden-backup.exe
+
+# Data and backups
+data/
+backups/
+*.db
+
+# Environment and secrets
+.env
+.env.*
+
+# IDE and editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Documentation (not needed in image)
+docs/
+*.md
+!README.md
+
+# Claude AI context
+.claude/
+CLAUDE.md
+web/CLAUDE.md
+
+# Development scripts
+dev.sh
+start.sh
+
+# Temporary files
+*.tmp
+*.log
+.tmp/
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,102 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: '版本递增类型'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "mingzaily"
+          git config user.email "mingzaily@163.com"
+
+      - name: Calculate next version
+        id: version
+        run: |
+          # 获取最新标签
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+
+          # 解析版本号
+          VERSION=${LATEST_TAG#v}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
+          # 根据类型递增
+          case "${{ inputs.bump_type }}" in
+            major)
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            minor)
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            patch)
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          echo "New version: $NEW_VERSION"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "previous_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+
+      - name: Create and push tag
+        run: |
+          git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" \
+            --title "v${{ steps.version.outputs.version }}" \
+            --generate-notes \
+            --notes-start-tag "${{ steps.version.outputs.previous_tag }}"
+
+      - name: Append Docker Info
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # 获取现有的 release body
+          CURRENT_BODY=$(gh release view "v${{ steps.version.outputs.version }}" --json body -q .body)
+
+          # 追加 Docker 信息
+          NEW_BODY="${CURRENT_BODY}
+
+          ---
+          ### 🐳 Docker 镜像
+
+          \`\`\`bash
+          docker pull ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
+          \`\`\`
+
+          或使用 latest 标签：
+          \`\`\`bash
+          docker pull ghcr.io/${{ github.repository }}:latest
+          \`\`\`"
+
+          # 更新 release
+          gh release edit "v${{ steps.version.outputs.version }}" --notes "$NEW_BODY"
