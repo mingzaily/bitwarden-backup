@@ -47,7 +47,18 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
     ./cmd/server
 
 # ============================================
-# Stage 3: Runtime
+# Stage 3: Bitwarden CLI Builder
+# ============================================
+# Install the CLI on the build platform. The package is JavaScript/WASM, so
+# copying it into each target image avoids running npm through QEMU for arm64.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS bitwarden-cli-builder
+
+ARG BW_CLI_VERSION=latest
+RUN npm install -g @bitwarden/cli@${BW_CLI_VERSION} && \
+    npm cache clean --force
+
+# ============================================
+# Stage 4: Runtime
 # ============================================
 FROM node:22-alpine AS runtime
 
@@ -56,10 +67,10 @@ RUN apk add --no-cache \
     ca-certificates \
     tzdata
 
-# Install Bitwarden
-ARG BW_CLI_VERSION=latest
-RUN npm install -g @bitwarden/cli@${BW_CLI_VERSION} && \
-    npm cache clean --force
+# Copy the CLI installed on the build platform above. Do not run npm here:
+# this stage is built for each target architecture and may run under QEMU.
+COPY --from=bitwarden-cli-builder /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -s /usr/local/lib/node_modules/@bitwarden/cli/build/bw.js /usr/local/bin/bw
 
 # 使用 node:alpine 内置的 node 用户 (UID 1000)
 # 无需创建新用户，直接复用
