@@ -44,10 +44,9 @@
               <div class="field">
                 <div class="field-label-row">
                   <label class="field-label" for="client-secret">Client Secret</label>
-                  <span v-if="server" class="field-label-note">可选</span>
                 </div>
                 <input id="client-secret" v-model="formData.client_secret" class="input" type="password" :required="!server" autocomplete="new-password" :placeholder="server ? '留空保持原值' : '输入 Client Secret'" />
-                <p v-if="server" class="field-hint">留空表示不修改当前凭证。</p>
+                <p class="field-hint">{{ server ? '留空表示不修改当前凭证；填写后将替换。' : '请登录后台查看。' }}</p>
               </div>
               <div class="field">
                 <div class="field-label-row">
