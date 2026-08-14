@@ -8,7 +8,7 @@
         type="button"
         role="checkbox"
         :aria-checked="isSelected(option.value)"
-        :class="['check-option text-left', isSelected(option.value) ? 'is-selected' : '']"
+        :class="['check-option selection-card text-left', isSelected(option.value) ? 'is-selected' : '']"
         @click="toggleOption(option.value)"
       >
         <span class="check-box" aria-hidden="true">

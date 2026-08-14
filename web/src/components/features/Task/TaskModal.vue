@@ -38,7 +38,7 @@
               <div class="schedule-mode-list" role="radiogroup" aria-label="运行方式">
                 <button
                   type="button"
-                  :class="['schedule-mode-card', scheduleMode === 'manual' ? 'is-active' : '']"
+                  :class="['schedule-mode-card selection-card', scheduleMode === 'manual' ? 'is-active' : '']"
                   role="radio"
                   :aria-checked="scheduleMode === 'manual'"
                   @click="setScheduleMode('manual')"
@@ -54,7 +54,7 @@
                 </button>
                 <button
                   type="button"
-                  :class="['schedule-mode-card', scheduleMode === 'scheduled' ? 'is-active' : '']"
+                  :class="['schedule-mode-card selection-card', scheduleMode === 'scheduled' ? 'is-active' : '']"
                   role="radio"
                   :aria-checked="scheduleMode === 'scheduled'"
                   @click="setScheduleMode('scheduled')"
