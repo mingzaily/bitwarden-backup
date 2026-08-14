@@ -1,279 +1,167 @@
 <template>
   <Teleport to="body">
-    <div class="modal show" @click.self="$emit('close')">
-      <div class="modal-content bg-white rounded-lg border-2 border-black shadow-brutalist max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-      <!-- Modal Header -->
-      <div class="px-6 py-4 border-b-2 border-black bg-brutalist-cream/20">
-        <div class="flex items-center justify-between">
-          <h3 class="text-lg font-black text-gray-900">
-            {{ destination ? '编辑备份目标' : '新建备份目标' }}
-          </h3>
-          <button @click="$emit('close')" class="text-gray-700 hover:text-gray-900 font-bold">
-            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
+    <div class="modal-backdrop" @click.self="$emit('close')">
+      <div class="modal-panel modal-panel-wide" role="dialog" aria-modal="true" :aria-label="destination ? '编辑存储目标' : '新建存储目标'">
+        <div class="modal-header">
+          <div>
+            <h3 class="modal-title">{{ destination ? '编辑存储目标' : '新建存储目标' }}</h3>
+            <p class="modal-subtitle">{{ destination ? '更新存储方式或策略；敏感字段留空会保留当前值。' : '选择存储方式，再补充连接参数和备份保留策略。' }}</p>
+          </div>
+          <button class="icon-button" type="button" aria-label="关闭" @click="$emit('close')">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="m6 6 12 12M18 6 6 18" /></svg>
+          </button>
+        </div>
+
+        <form id="destination-form" class="modal-body grid gap-5" @submit.prevent="handleSubmit">
+          <section class="form-section">
+            <div class="form-section-heading">
+              <h4 class="form-section-title">目标信息</h4>
+              <p class="form-section-description">名称会出现在任务流程和运行记录中。</p>
+            </div>
+            <div class="field">
+              <label class="field-label" for="destination-name">存储目标名称</label>
+              <input id="destination-name" v-model.trim="formData.name" class="input" type="text" required placeholder="例如：异地 WebDAV" />
+            </div>
+            <TabSelector v-model="formData.type" :options="storageTypes" label="存储类型" />
+            <div v-if="formData.type === 'server'" class="field destination-primary-field">
+              <CustomSelect
+                v-model="formData.target_server_id"
+                :options="serverOptions"
+                label="目标服务器"
+                placeholder="请选择目标服务器"
+                empty-text="暂无可用源站，请先创建源站"
+              />
+              <p class="field-hint">备份文件会导入这个已配置的 Bitwarden 目标服务器。</p>
+            </div>
+          </section>
+
+          <section v-if="formData.type !== 'server'" class="form-section">
+            <div class="form-section-heading">
+              <h4 class="form-section-title">连接配置</h4>
+              <p class="form-section-description">只显示当前存储类型需要的字段，密码编辑时留空表示保持原值。</p>
+            </div>
+
+            <div v-if="formData.type === 'local'" class="field">
+              <label class="field-label" for="local-path">本地路径</label>
+              <input id="local-path" v-model="formData.local_path" class="input" type="text" required placeholder="/data/backups" />
+              <p class="field-hint">请填写绝对路径，例如 <code>/app/backups</code> 或 <code>D:/backups</code>。</p>
+            </div>
+
+            <div v-else-if="formData.type === 'webdav'" class="grid gap-4">
+              <div class="field">
+                <label class="field-label" for="webdav-url">WebDAV URL</label>
+                <input id="webdav-url" v-model="formData.webdav_url" class="input" type="url" required placeholder="https://dav.example.com" />
+              </div>
+              <div class="form-grid">
+                <div class="field">
+                  <label class="field-label" for="webdav-username">用户名</label>
+                  <input id="webdav-username" v-model="formData.webdav_username" class="input" type="text" autocomplete="username" />
+                </div>
+                <div class="field">
+                  <label class="field-label" for="webdav-password">密码</label>
+                  <input id="webdav-password" v-model="formData.webdav_password" class="input" type="password" :required="!destination" autocomplete="new-password" :placeholder="destination ? '留空保持原值' : '输入 WebDAV 密码'" />
+                  <p v-if="destination" class="field-hint">留空表示不修改当前密码。</p>
+                </div>
+              </div>
+              <div class="field">
+                <label class="field-label" for="webdav-path">存储路径 <span>可选</span></label>
+                <input id="webdav-path" v-model="formData.webdav_path" class="input" type="text" placeholder="/bitwarden-backup" />
+                <p class="field-hint">留空会使用默认路径 <code>/bitwarden-backup</code>。</p>
+              </div>
+            </div>
+
+            <div v-else-if="formData.type === 's3'" class="grid gap-4">
+              <div class="form-grid">
+                <div class="field">
+                  <label class="field-label" for="s3-endpoint">Endpoint</label>
+                  <input id="s3-endpoint" v-model="formData.s3_endpoint" class="input" type="url" required placeholder="https://s3.amazonaws.com" />
+                  <p class="field-hint">填写完整地址，例如 <code>https://s3.amazonaws.com</code>。</p>
+                </div>
+                <div class="field">
+                  <label class="field-label" for="s3-region">区域 <span>Region</span></label>
+                  <input id="s3-region" v-model="formData.s3_region" class="input" type="text" required placeholder="us-east-1" />
+                </div>
+              </div>
+              <div class="field">
+                <label class="field-label" for="s3-bucket">Bucket 名称</label>
+                <input id="s3-bucket" v-model="formData.s3_bucket" class="input" type="text" required />
+              </div>
+              <div class="form-grid">
+                <div class="field">
+                  <label class="field-label" for="s3-access-key">Access Key <span v-if="destination">可选</span></label>
+                  <input id="s3-access-key" v-model="formData.s3_access_key" class="input" type="text" autocomplete="off" />
+                </div>
+                <div class="field">
+                  <label class="field-label" for="s3-secret-key">Secret Key</label>
+                  <input id="s3-secret-key" v-model="formData.s3_secret_key" class="input" type="password" :required="!destination" autocomplete="new-password" :placeholder="destination ? '留空保持原值' : '输入 Secret Key'" />
+                  <p v-if="destination" class="field-hint">留空表示不修改当前密钥。</p>
+                </div>
+              </div>
+              <div class="field">
+                <label class="field-label" for="s3-path">存储路径 <span>可选</span></label>
+                <input id="s3-path" v-model="formData.s3_path" class="input" type="text" placeholder="/bitwarden-backup" />
+                <p class="field-hint">留空会使用默认路径 <code>/bitwarden-backup</code>。</p>
+              </div>
+            </div>
+
+          </section>
+
+          <section v-if="['local', 'webdav', 's3'].includes(formData.type)" class="form-section">
+            <div class="form-section-heading">
+              <h4 class="form-section-title">安全与保留</h4>
+              <p class="form-section-description">把备份文件保护和清理策略放在一起，保存前可以清楚确认影响范围。</p>
+            </div>
+            <div class="surface-muted flex items-center justify-between gap-4 p-3">
+              <div>
+                <p class="text-sm font-semibold text-main">加密备份文件</p>
+                <p class="mt-1 text-xs text-muted">使用密码保护导出的备份文件。</p>
+              </div>
+              <ToggleButton v-model="formData.encrypted" label="启用" aria-label="加密备份文件" />
+            </div>
+            <div v-if="formData.encrypted" class="field">
+              <label class="field-label" for="encryption-password">加密密码</label>
+              <input id="encryption-password" v-model="formData.encryption_password" class="input" type="password" :required="!destination || !destination.encrypted" autocomplete="new-password" :placeholder="destination ? '留空保持原值' : '请输入加密密码'" />
+              <p class="field-hint">{{ destination ? '留空表示不修改。' : '解密备份文件时需要使用相同密码。' }}</p>
+            </div>
+            <div class="surface-muted flex items-center justify-between gap-4 p-3">
+              <div>
+                <p class="text-sm font-semibold text-main">限制保留数量</p>
+                <p class="mt-1 text-xs text-muted">超过数量后自动删除最旧的备份文件。</p>
+              </div>
+              <ToggleButton v-model="retentionEnabled" label="启用" aria-label="限制保留数量" />
+            </div>
+            <div v-if="retentionEnabled" class="field">
+              <label class="field-label" for="max-backup-count">最多保留份数</label>
+              <div class="relative">
+                <input id="max-backup-count" v-model.number="formData.max_backup_count" class="input pr-12" type="number" min="1" placeholder="5" />
+                <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-semibold text-muted">份</span>
+              </div>
+              <p class="field-hint text-warning">超过限制时会自动删除最旧的备份文件。</p>
+            </div>
+            <p v-else class="field-hint">当前保留所有历史备份文件，不限制数量。</p>
+          </section>
+        </form>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" @click="$emit('close')">取消</button>
+          <button form="destination-form" type="submit" class="btn-primary" :disabled="loading">
+            <span v-if="loading" class="spinner"></span>{{ loading ? '保存中…' : destination ? '保存更改' : '保存存储目标' }}
           </button>
         </div>
       </div>
-
-      <!-- Modal Body -->
-      <form @submit.prevent="handleSubmit" class="p-6 space-y-4">
-        <div>
-          <label class="block text-sm font-bold text-gray-900 mb-2">目标名称</label>
-          <input
-            v-model="formData.name"
-            type="text"
-            required
-            class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
-            placeholder="例如：本地备份"
-          />
-        </div>
-
-        <TabSelector
-          v-model="formData.type"
-          :options="storageTypes"
-          label="存储类型"
-        />
-
-        <!-- Local Config -->
-        <div v-if="formData.type === 'local'" class="space-y-4">
-          <div>
-            <label class="block text-sm font-bold text-gray-900 mb-2">本地路径</label>
-            <input
-              v-model="formData.local_path"
-              type="text"
-              required
-              class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
-              placeholder="/data/backups"
-            />
-            <p class="mt-1 text-xs text-gray-600">
-              💡 请填写绝对路径，例如：<code class="px-1 py-0.5 bg-gray-100 rounded">/app/backups</code> 或 <code class="px-1 py-0.5 bg-gray-100 rounded">D:/backups</code>
-            </p>
-          </div>
-        </div>
-
-        <!-- WebDAV Config -->
-        <div v-if="formData.type === 'webdav'" class="space-y-4">
-          <div>
-            <label class="block text-sm font-bold text-gray-900 mb-2">WebDAV URL</label>
-            <input
-              v-model="formData.webdav_url"
-              type="text"
-              required
-              class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
-              placeholder="https://dav.example.com"
-            />
-          </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-bold text-gray-900 mb-2">用户名</label>
-              <input
-                v-model="formData.webdav_username"
-                type="text"
-                class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
-              />
-            </div>
-            <div>
-              <label class="block text-sm font-bold text-gray-900 mb-2">密码</label>
-              <input
-                v-model="formData.webdav_password"
-                type="password"
-                :required="!destination"
-                class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
-              />
-              <p v-if="destination" class="mt-1 text-xs text-gray-600">
-                💡 留空表示不修改
-              </p>
-            </div>
-          </div>
-          <div>
-            <label class="block text-sm font-bold text-gray-900 mb-2">存储路径</label>
-            <input
-              v-model="formData.webdav_path"
-              type="text"
-              class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
-              placeholder="/bitwarden-backup（默认）"
-            />
-            <p class="text-xs text-gray-600 mt-1">
-              💡 留空将使用默认路径 /bitwarden-backup
-            </p>
-          </div>
-        </div>
-
-        <!-- S3 Config -->
-        <div v-if="formData.type === 's3'" class="space-y-4">
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-bold text-gray-900 mb-2">Endpoint</label>
-              <input
-                v-model="formData.s3_endpoint"
-                type="text"
-                required
-                class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
-                placeholder="s3.amazonaws.com"
-              />
-            </div>
-            <div>
-              <label class="block text-sm font-bold text-gray-900 mb-2">区域 (Region)</label>
-              <input
-                v-model="formData.s3_region"
-                type="text"
-                required
-                class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
-                placeholder="us-east-1"
-              />
-            </div>
-          </div>
-          <div>
-            <label class="block text-sm font-bold text-gray-900 mb-2">Bucket 名称</label>
-            <input
-              v-model="formData.s3_bucket"
-              type="text"
-              required
-              class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
-            />
-          </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-bold text-gray-900 mb-2">Access Key</label>
-              <input
-                v-model="formData.s3_access_key"
-                type="text"
-                class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
-              />
-            </div>
-            <div>
-              <label class="block text-sm font-bold text-gray-900 mb-2">Secret Key</label>
-              <input
-                v-model="formData.s3_secret_key"
-                type="password"
-                :required="!destination"
-                class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
-              />
-              <p v-if="destination" class="mt-1 text-xs text-gray-600">
-                💡 留空表示不修改
-              </p>
-            </div>
-          </div>
-          <div>
-            <label class="block text-sm font-bold text-gray-900 mb-2">存储路径</label>
-            <input
-              v-model="formData.s3_path"
-              type="text"
-              class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
-              placeholder="/bitwarden-backup（默认）"
-            />
-            <p class="text-xs text-gray-600 mt-1">
-              💡 留空将使用默认路径 /bitwarden-backup
-            </p>
-          </div>
-        </div>
-
-        <!-- Server Config -->
-        <div v-if="formData.type === 'server'" class="space-y-4">
-          <CustomSelect
-            v-model="formData.target_server_id"
-            :options="servers.map(s => ({
-              label: s.name,
-              value: s.id,
-              description: s.server_url
-            }))"
-            label="目标服务器"
-            placeholder="请选择目标服务器"
-            empty-text="⚠️ 暂无可用服务器，请先创建服务器"
-          />
-        </div>
-
-        <!-- 加密选项（仅本地和 WebDAV 和 S3 显示） -->
-        <div v-if="['local', 'webdav', 's3'].includes(formData.type)" class="space-y-3">
-          <label class="block text-sm font-bold text-gray-900">备份文件加密</label>
-          <ToggleButton v-model="formData.encrypted" label="加密备份文件" />
-          <p class="text-xs text-gray-600 mt-1">
-            💡 启用后将使用您设置的密码对备份文件进行加密保护
-          </p>
-
-          <!-- 加密密码输入（仅在启用加密时显示） -->
-          <div v-if="formData.encrypted" class="mt-3">
-            <label class="block text-sm font-bold text-gray-900 mb-2">加密密码</label>
-            <input
-              v-model="formData.encryption_password"
-              type="password"
-              :required="!destination"
-              class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue"
-              placeholder="请输入加密密码"
-            />
-            <p class="text-xs text-gray-600 mt-1">
-              <template v-if="destination">💡 留空表示不修改</template>
-              <template v-else>💡 此密码用于加密导出的备份文件，解密时需要使用相同密码</template>
-            </p>
-          </div>
-        </div>
-
-        <!-- 备份保留策略（仅本地、WebDAV、S3 显示） -->
-        <div v-if="['local', 'webdav', 's3'].includes(formData.type)" class="space-y-3">
-          <label class="block text-sm font-bold text-gray-900">备份保留策略</label>
-          <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-700">限制保留数量</span>
-            <ToggleButton v-model="retentionEnabled" label="" />
-          </div>
-
-          <div v-if="retentionEnabled" class="mt-2">
-            <div class="relative">
-              <input
-                v-model.number="formData.max_backup_count"
-                type="number"
-                min="1"
-                class="w-full px-3 py-2 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-brutalist-blue pr-10"
-                placeholder="5"
-              />
-              <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                <span class="text-gray-500 font-bold text-sm">份</span>
-              </div>
-            </div>
-            <p class="text-xs text-red-600 mt-1 font-medium">
-              ⚠️ 超过限制时将自动删除最旧的备份文件
-            </p>
-          </div>
-          <p v-else class="text-xs text-gray-500 mt-1">
-            💡 当前保留所有历史备份文件（不限制数量）
-          </p>
-        </div>
-
-        <!-- Modal Footer -->
-        <div class="flex justify-end gap-3 pt-4 border-t-2 border-black">
-          <button
-            type="button"
-            @click="$emit('close')"
-            class="px-4 py-2 text-sm font-bold text-gray-700 bg-white border-2 border-black rounded-lg hover:bg-gray-50 transition-all"
-          >
-            取消
-          </button>
-          <button
-            type="submit"
-            :disabled="loading"
-            class="btn-brutalist px-4 py-2 text-sm rounded-lg disabled:opacity-50"
-          >
-            {{ loading ? '保存中...' : '保存' }}
-          </button>
-        </div>
-      </form>
     </div>
-  </div>
   </Teleport>
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { destinationsApi, serversApi } from '@/api'
 import { useToast } from '@/composables/useToast'
 import TabSelector from '@/components/ui/TabSelector.vue'
 import ToggleButton from '@/components/ui/ToggleButton.vue'
 import CustomSelect from '@/components/ui/CustomSelect.vue'
 
-const props = defineProps({
-  destination: Object
-})
-
+const props = defineProps({ destination: Object })
 const emit = defineEmits(['close', 'saved'])
 const toast = useToast()
 
@@ -285,158 +173,134 @@ const storageTypes = [
 ]
 
 const servers = ref([])
-
-const formData = ref({
-  name: '',
-  type: 'local',
-  local_path: '',
-  webdav_url: '',
-  webdav_username: '',
-  webdav_password: '',
-  webdav_path: '',
-  s3_endpoint: '',
-  s3_region: '',
-  s3_bucket: '',
-  s3_access_key: '',
-  s3_secret_key: '',
-  s3_path: '',
-  target_server_id: '',
-  enabled: true,
-  encrypted: false,
-  encryption_password: '',
-  max_backup_count: 5
+const emptyForm = () => ({
+  name: '', type: 'local', local_path: '', webdav_url: '', webdav_username: '', webdav_password: '', webdav_path: '',
+  s3_endpoint: '', s3_region: '', s3_bucket: '', s3_access_key: '', s3_secret_key: '', s3_path: '', target_server_id: '',
+  enabled: true, encrypted: false, encryption_password: '', max_backup_count: 5
 })
-
+const formData = ref(emptyForm())
 const loading = ref(false)
 const retentionEnabled = ref(false)
+const serverOptions = computed(() => {
+  const currentID = Number(formData.value.target_server_id || 0)
+  return servers.value
+    .filter(server => server.enabled || Number(server.id) === currentID)
+    .map(server => ({
+      label: server.name,
+      value: server.id,
+      description: `${server.server_url}${server.enabled ? '' : ' · 已停用'}`
+    }))
+})
 
-watch(() => props.destination, (newDest) => {
-  if (newDest) {
+watch(() => props.destination, (newDestination) => {
+  if (newDestination) {
     formData.value = {
-      ...newDest,
-      // Ensure local_path is set from either local_path or path if old data exists
-      local_path: newDest.local_path || (newDest.type === 'local' ? newDest.path : ''),
-      target_server_id: newDest.target_server_id || '',
-      encrypted: newDest.encrypted || false,
-      encryption_password: newDest.encryption_password || '',
-      max_backup_count: newDest.max_backup_count || 5
-    }
-    retentionEnabled.value = (newDest.max_backup_count && newDest.max_backup_count > 0)
-  } else {
-    formData.value = {
-      name: '',
-      type: 'local',
-      local_path: '',
-      webdav_url: '',
-      webdav_username: '',
+      ...newDestination,
+      local_path: newDestination.local_path || (newDestination.type === 'local' ? newDestination.path : ''),
+      target_server_id: newDestination.target_server_id || '',
       webdav_password: '',
-      webdav_path: '',
-      s3_endpoint: '',
-      s3_region: '',
-      s3_bucket: '',
       s3_access_key: '',
       s3_secret_key: '',
-      s3_path: '',
-      target_server_id: '',
-      enabled: true,
-      encrypted: false,
-      encryption_password: '',
-      max_backup_count: 5
+      encrypted: newDestination.encrypted || false,
+      encryption_password: newDestination.encryption_password || '',
+      max_backup_count: newDestination.max_backup_count || 5
     }
+    retentionEnabled.value = Boolean(newDestination.max_backup_count && newDestination.max_backup_count > 0)
+  } else {
+    formData.value = emptyForm()
     retentionEnabled.value = false
   }
 }, { immediate: true })
 
+watch(() => formData.value.type, (type) => {
+  if (type === 'server') {
+    formData.value.encrypted = false
+    formData.value.encryption_password = ''
+    retentionEnabled.value = false
+  } else {
+    formData.value.target_server_id = ''
+  }
+})
+
 const loadServers = async () => {
   try {
-    const res = await serversApi.getAll({ enabled: true })
+    const res = await serversApi.getAll({ page: 1, page_size: 1000 })
     servers.value = res.data || []
   } catch (error) {
     console.error('Failed to load servers:', error)
   }
 }
 
-onMounted(() => {
-  loadServers()
-})
+onMounted(loadServers)
+
+const buildSubmitData = () => {
+  const current = formData.value
+  const data = {
+    name: current.name.trim(),
+    type: current.type,
+    enabled: current.enabled,
+    encrypted: current.type === 'server' ? false : Boolean(current.encrypted),
+    max_backup_count: current.type === 'server' ? 0 : retentionEnabled.value ? Number(current.max_backup_count) || 5 : 0
+  }
+
+  if (current.type === 'local') {
+    data.local_path = current.local_path.trim()
+  } else if (current.type === 'webdav') {
+    data.webdav_url = current.webdav_url.trim()
+    data.webdav_username = current.webdav_username
+    data.webdav_path = current.webdav_path.trim() || '/bitwarden-backup'
+    if (current.webdav_password) data.webdav_password = current.webdav_password
+  } else if (current.type === 's3') {
+    data.s3_endpoint = current.s3_endpoint.trim()
+    data.s3_region = current.s3_region.trim()
+    data.s3_bucket = current.s3_bucket.trim()
+    data.s3_path = current.s3_path.trim() || '/bitwarden-backup'
+    if (current.s3_access_key) data.s3_access_key = current.s3_access_key
+    if (current.s3_secret_key) data.s3_secret_key = current.s3_secret_key
+  } else if (current.type === 'server') {
+    data.target_server_id = Number(current.target_server_id)
+  }
+
+  if (data.encrypted && current.encryption_password) data.encryption_password = current.encryption_password
+  if (!props.destination?.id) delete data.enabled
+  return data
+}
 
 const handleSubmit = async () => {
-  // 加密密码校验：新建时启用加密必须填写密码
-  if (!props.destination?.id && formData.value.encrypted && !formData.value.encryption_password) {
+  if (!formData.value.name.trim()) {
+    toast.error('请输入存储目标名称')
+    return
+  }
+  if (formData.value.type === 'server' && !formData.value.target_server_id) {
+    toast.error('请选择目标服务器')
+    return
+  }
+  if (formData.value.encrypted && !formData.value.encryption_password && !props.destination?.encrypted) {
     toast.error('启用加密时必须设置加密密码')
+    return
+  }
+  if (retentionEnabled.value && Number(formData.value.max_backup_count) < 1) {
+    toast.error('最多保留份数必须大于 0')
     return
   }
 
   loading.value = true
   try {
-    const data = { ...formData.value }
-
-    // 修复：删除时间字段（避免后端解析错误）
-    delete data.created_at
-    delete data.updated_at
-    delete data.id
-
-    // 调试日志
-    console.log('提交数据:', data)
-    console.log('目标服务器ID:', data.target_server_id)
-
-    // 新增时不传 enabled 参数（后端默认为 true）
-    if (!props.destination?.id) {
-      delete data.enabled
-    }
-
-    // 修复：删除空值的 target_server_id（避免后端类型不匹配）
-    if (!data.target_server_id || data.target_server_id === '') {
-      delete data.target_server_id
-    } else {
-      // 确保 target_server_id 是数字类型
-      data.target_server_id = Number(data.target_server_id)
-    }
-
-    // 设置默认存储路径
-    if (data.type === 'webdav' && (!data.webdav_path || data.webdav_path.trim() === '')) {
-      data.webdav_path = '/bitwarden-backup'
-    }
-    if (data.type === 's3' && (!data.s3_path || data.s3_path.trim() === '')) {
-      data.s3_path = '/bitwarden-backup'
-    }
-
-    // 处理备份保留数量
-    if (!retentionEnabled.value) {
-      data.max_backup_count = 0
-    } else {
-      data.max_backup_count = Number(data.max_backup_count) || 5
-    }
+    const data = buildSubmitData()
 
     if (props.destination?.id) {
       await destinationsApi.update(props.destination.id, data)
-      toast.success('备份目标已更新')
+      toast.success('存储目标已更新')
     } else {
       await destinationsApi.create(data)
-      toast.success('备份目标已创建')
+      toast.success('存储目标已创建')
     }
     emit('saved')
   } catch (error) {
     console.error('保存失败:', error)
-    toast.error(`保存失败: ${error.message}`)
+    toast.error(error.message || '保存存储目标失败')
   } finally {
     loading.value = false
   }
 }
 </script>
-
-<style scoped>
-.modal {
-  display: flex;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 9999;
-  background-color: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-  align-items: center;
-  justify-content: center;
-}
-</style>

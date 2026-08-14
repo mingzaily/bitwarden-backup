@@ -2,30 +2,27 @@ package handler
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mingzaily/bitwarden-backup/internal/model"
 )
 
 // GetServers 获取所有服务器配置（支持分页）
-func GetServers(c *gin.Context) {
+func (a *API) GetServers(c *gin.Context) {
 	var params model.PaginationParams
-	if err := c.ShouldBindQuery(&params); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if !bindQuery(c, &params) {
 		return
 	}
 
 	// 解析 enabled 参数
-	var enabled *bool
-	if enabledStr := c.Query("enabled"); enabledStr != "" {
-		e := enabledStr == "true"
-		enabled = &e
+	enabled, ok := parseOptionalBoolQuery(c, "enabled")
+	if !ok {
+		return
 	}
 
-	servers, total, err := serverSvc.GetPaginated(params, enabled)
+	servers, total, err := a.serverService.GetPaginated(params, enabled)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeInternalError(c, "list servers", err)
 		return
 	}
 
@@ -40,35 +37,28 @@ func GetServers(c *gin.Context) {
 }
 
 // GetServer 获取单个服务器配置
-func GetServer(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+func (a *API) GetServer(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
 		return
 	}
-	server, err := serverSvc.GetByID(uint(id))
+	server, err := a.serverService.GetByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Server not found"})
+		writeLookupError(c, "server", "load server", err)
 		return
 	}
 	c.JSON(http.StatusOK, server.ToResponse())
 }
 
 // CreateServer 创建服务器配置
-func CreateServer(c *gin.Context) {
+func (a *API) CreateServer(c *gin.Context) {
 	var req model.ServerRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if !bindJSON(c, &req) {
 		return
 	}
 
-	// 新增时敏感字段不能为空
-	if req.ClientSecret == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "client_secret is required"})
-		return
-	}
-	if req.MasterPassword == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "master_password is required"})
+	if err := validateServerRequest(req, true); err != nil {
+		writeBadRequest(c, err.Error())
 		return
 	}
 
@@ -78,84 +68,109 @@ func CreateServer(c *gin.Context) {
 		ClientID:       req.ClientID,
 		ClientSecret:   req.ClientSecret,
 		MasterPassword: req.MasterPassword,
-		IsOfficial:     req.IsOfficial,
+		IsOfficial:     model.IsOfficialServerURL(req.ServerURL),
 		Enabled:        true,
 	}
 
-	if err := serverSvc.Create(server); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err := a.serverService.Create(server); err != nil {
+		writeInternalError(c, "create server", err)
 		return
 	}
 	c.JSON(http.StatusCreated, server.ToResponse())
 }
 
 // UpdateServer 更新服务器配置
-func UpdateServer(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+func (a *API) UpdateServer(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
 		return
 	}
 
 	var req model.ServerRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if !bindJSON(c, &req) {
+		return
+	}
+	if err := validateServerRequest(req, false); err != nil {
+		writeBadRequest(c, err.Error())
 		return
 	}
 
-	// 判断是否仅更新 enabled 状态
-	isToggleOnly := req.Enabled != nil && req.Name == "" && req.ServerURL == "" && req.ClientID == ""
+	// 获取现有记录并应用完整更新。
+	existing, err := a.serverService.GetByID(id)
+	if err != nil {
+		writeLookupError(c, "server", "load server for update", err)
+		return
+	}
 
-	if isToggleOnly {
-		if err := serverSvc.UpdateEnabled(uint(id), *req.Enabled); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-	} else {
-		// 获取现有记录
-		existing, err := serverSvc.GetByID(uint(id))
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Server not found"})
-			return
-		}
-
-		// 更新非敏感字段
-		existing.Name = req.Name
-		existing.ServerURL = req.ServerURL
+	existing.Name = req.Name
+	existing.ServerURL = req.ServerURL
+	if req.ClientID != "" {
 		existing.ClientID = req.ClientID
-		existing.IsOfficial = req.IsOfficial
-		if req.Enabled != nil {
-			existing.Enabled = *req.Enabled
-		}
+	}
+	existing.IsOfficial = model.IsOfficialServerURL(req.ServerURL)
+	if req.Enabled != nil {
+		existing.Enabled = *req.Enabled
+	}
 
-		// 敏感字段：空值不更新
-		if req.ClientSecret != "" {
-			existing.ClientSecret = req.ClientSecret
-		}
-		if req.MasterPassword != "" {
-			existing.MasterPassword = req.MasterPassword
-		}
+	// 敏感字段：空值不更新
+	if req.ClientSecret != "" {
+		existing.ClientSecret = req.ClientSecret
+	}
+	if req.MasterPassword != "" {
+		existing.MasterPassword = req.MasterPassword
+	}
 
-		if err := serverSvc.Update(uint(id), existing); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
+	if err := a.serverService.Update(id, existing); err != nil {
+		writeLookupError(c, "server", "update server", err)
+		return
 	}
 
 	// 重新获取更新后的数据
-	updated, _ := serverSvc.GetByID(uint(id))
+	updated, err := a.serverService.GetByID(id)
+	if err != nil {
+		writeLookupError(c, "server", "load updated server", err)
+		return
+	}
 	c.JSON(http.StatusOK, updated.ToResponse())
 }
 
-// DeleteServer 删除服务器配置
-func DeleteServer(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+// SetServerEnabled updates only the server state. Keeping this separate from
+// the full update endpoint avoids inferring intent from omitted fields.
+func (a *API) SetServerEnabled(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
 		return
 	}
-	if err := serverSvc.Delete(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+
+	var request model.EnabledRequest
+	if !bindJSON(c, &request) {
+		return
+	}
+	if request.Enabled == nil {
+		writeBadRequest(c, "enabled is required")
+		return
+	}
+	if err := a.serverService.UpdateEnabled(id, *request.Enabled); err != nil {
+		writeLookupError(c, "server", "update server status", err)
+		return
+	}
+
+	server, err := a.serverService.GetByID(id)
+	if err != nil {
+		writeLookupError(c, "server", "load updated server", err)
+		return
+	}
+	c.JSON(http.StatusOK, server.ToResponse())
+}
+
+// DeleteServer 删除服务器配置
+func (a *API) DeleteServer(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+	if err := a.serverService.Delete(id); err != nil {
+		writeLookupError(c, "server", "delete server", err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Server deleted"})

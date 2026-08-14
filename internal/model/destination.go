@@ -82,28 +82,28 @@ func (d *BackupDestination) BeforeSave(tx *gorm.DB) error {
 // AfterFind GORM 钩子：查询后解密敏感字段
 func (d *BackupDestination) AfterFind(tx *gorm.DB) error {
 	if d.WebDAVPassword != "" {
-		decrypted, err := crypto.Decrypt(d.WebDAVPassword)
+		decrypted, err := decryptSensitive(d.WebDAVPassword)
 		if err != nil {
 			return err
 		}
 		d.WebDAVPassword = decrypted
 	}
 	if d.S3AccessKey != "" {
-		decrypted, err := crypto.Decrypt(d.S3AccessKey)
+		decrypted, err := decryptSensitive(d.S3AccessKey)
 		if err != nil {
 			return err
 		}
 		d.S3AccessKey = decrypted
 	}
 	if d.S3SecretKey != "" {
-		decrypted, err := crypto.Decrypt(d.S3SecretKey)
+		decrypted, err := decryptSensitive(d.S3SecretKey)
 		if err != nil {
 			return err
 		}
 		d.S3SecretKey = decrypted
 	}
 	if d.EncryptionPassword != "" {
-		decrypted, err := crypto.Decrypt(d.EncryptionPassword)
+		decrypted, err := decryptSensitive(d.EncryptionPassword)
 		if err != nil {
 			return err
 		}

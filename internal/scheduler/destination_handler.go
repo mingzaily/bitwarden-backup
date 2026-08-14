@@ -1,13 +1,15 @@
 package scheduler
 
 import (
+	"context"
+
 	"github.com/mingzaily/bitwarden-backup/internal/logger"
 
 	"github.com/mingzaily/bitwarden-backup/internal/model"
 	"github.com/mingzaily/bitwarden-backup/internal/provider"
 )
 
-func (s *Scheduler) backupToDestination(dest model.BackupDestination, sourceFile, taskName, timestamp string) (string, error) {
+func (s *Scheduler) backupToDestination(requestCtx context.Context, dest model.BackupDestination, sourceFile, taskName, timestamp string) (string, error) {
 	registry := provider.GetRegistry()
 
 	p, err := registry.Get(dest.Type)
@@ -16,6 +18,7 @@ func (s *Scheduler) backupToDestination(dest model.BackupDestination, sourceFile
 	}
 
 	ctx := provider.BackupContext{
+		Context:     requestCtx,
 		SourceFile:  sourceFile,
 		TaskName:    taskName,
 		Timestamp:   timestamp,

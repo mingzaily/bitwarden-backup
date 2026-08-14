@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/mingzaily/bitwarden-backup/internal/bitwarden"
 	"github.com/mingzaily/bitwarden-backup/internal/database"
@@ -35,7 +36,12 @@ func (p *ServerProvider) Backup(ctx BackupContext) (string, error) {
 		return "", fmt.Errorf("failed to get target server: %w", err)
 	}
 
-	bwCtx := context.Background()
+	bwCtx := ctx.Context
+	if bwCtx == nil {
+		bwCtx = context.Background()
+	}
+	bwCtx, cancel := context.WithTimeout(bwCtx, 5*time.Minute)
+	defer cancel()
 	client := bitwarden.NewClient()
 	if err := client.ConfigServer(bwCtx, targetServer.ServerURL); err != nil {
 		return "", fmt.Errorf("failed to config target server: %w", err)

@@ -1,9 +1,14 @@
 package provider
 
-import "github.com/mingzaily/bitwarden-backup/internal/model"
+import (
+	"context"
+
+	"github.com/mingzaily/bitwarden-backup/internal/model"
+)
 
 // BackupContext 备份上下文，包含备份所需的所有信息
 type BackupContext struct {
+	Context     context.Context
 	SourceFile  string // 源文件路径
 	TaskName    string // 任务名称
 	Timestamp   string // 时间戳

@@ -11,10 +11,10 @@ func (p *PaginationParams) GetOffset() int {
 	if p.Page <= 0 {
 		p.Page = 1
 	}
-	if p.PageSize <= 0 {
-		p.PageSize = 10
+	if p.Page > 1000000 {
+		p.Page = 1000000
 	}
-	return (p.Page - 1) * p.PageSize
+	return (p.Page - 1) * p.GetLimit()
 }
 
 // GetLimit 获取限制数量
@@ -44,6 +44,18 @@ type Pagination struct {
 
 // NewPaginatedResponse 创建分页响应
 func NewPaginatedResponse(data any, page, pageSize int, total int64) PaginatedResponse {
+	if page <= 0 {
+		page = 1
+	}
+	if page > 1000000 {
+		page = 1000000
+	}
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
 	totalPage := int(total) / pageSize
 	if int(total)%pageSize > 0 {
 		totalPage++

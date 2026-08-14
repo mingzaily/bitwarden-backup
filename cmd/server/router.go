@@ -6,57 +6,74 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mingzaily/bitwarden-backup/internal/auth"
 	"github.com/mingzaily/bitwarden-backup/internal/config"
 	"github.com/mingzaily/bitwarden-backup/internal/handler"
 )
 
-func setupRouter(cfg *config.Config) *gin.Engine {
+func setupRouter(cfg *config.Config, authManager *auth.Manager, api *handler.API) *gin.Engine {
 	// 根据环境设置 Gin 模式
 	if cfg.AppEnv == "dev" {
 		gin.SetMode(gin.DebugMode)
 		r := gin.Default() // 包含访问日志
-		return setupRoutes(r)
+		return setupRoutes(r, authManager, api)
 	} else {
 		gin.SetMode(gin.ReleaseMode)
 		r := gin.New()
 		r.Use(gin.Recovery()) // 仅保留 panic 恢复
-		return setupRoutes(r)
+		return setupRoutes(r, authManager, api)
 	}
 }
 
-func setupRoutes(r *gin.Engine) *gin.Engine {
+func setupRoutes(r *gin.Engine, authManager *auth.Manager, apiHandler *handler.API) *gin.Engine {
+	r.Use(securityHeaders())
+	r.GET("/healthz", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
 
 	// 静态资源（Vue 构建产物）
 	r.Static("/assets", "./web/dist/assets")
 
 	// API 路由
 	api := r.Group("/api")
+	api.Use(requestBodyLimit(1 << 20))
 	{
+		// 登录接口保持公开，其余 API 都需要管理员会话。
+		api.POST("/auth/login", authManager.Login)
+		protected := api.Group("")
+		protected.Use(authManager.Require(), authManager.CSRF())
+		protected.GET("/auth/session", authManager.Session)
+		protected.POST("/auth/logout", authManager.Logout)
+		protected.GET("/overview", apiHandler.GetOverview)
+
 		// 服务器配置
-		api.GET("/servers", handler.GetServers)
-		api.GET("/servers/:id", handler.GetServer)
-		api.POST("/servers", handler.CreateServer)
-		api.PUT("/servers/:id", handler.UpdateServer)
-		api.DELETE("/servers/:id", handler.DeleteServer)
+		protected.GET("/servers", apiHandler.GetServers)
+		protected.GET("/servers/:id", apiHandler.GetServer)
+		protected.POST("/servers", apiHandler.CreateServer)
+		protected.PUT("/servers/:id", apiHandler.UpdateServer)
+		protected.PATCH("/servers/:id/enabled", apiHandler.SetServerEnabled)
+		protected.DELETE("/servers/:id", apiHandler.DeleteServer)
 
 		// 备份目标
-		api.GET("/destinations", handler.GetDestinations)
-		api.GET("/destinations/:id", handler.GetDestination)
-		api.POST("/destinations", handler.CreateDestination)
-		api.PUT("/destinations/:id", handler.UpdateDestination)
-		api.DELETE("/destinations/:id", handler.DeleteDestination)
-		api.PATCH("/destinations/:id/toggle", handler.ToggleDestination)
+		protected.GET("/destinations", apiHandler.GetDestinations)
+		protected.GET("/destinations/:id", apiHandler.GetDestination)
+		protected.POST("/destinations", apiHandler.CreateDestination)
+		protected.PUT("/destinations/:id", apiHandler.UpdateDestination)
+		protected.PATCH("/destinations/:id/enabled", apiHandler.SetDestinationEnabled)
+		protected.DELETE("/destinations/:id", apiHandler.DeleteDestination)
+		protected.PATCH("/destinations/:id/toggle", apiHandler.ToggleDestination)
 
 		// 备份任务
-		api.GET("/tasks", handler.GetTasks)
-		api.GET("/tasks/:id", handler.GetTask)
-		api.POST("/tasks", handler.CreateTask)
-		api.PUT("/tasks/:id", handler.UpdateTask)
-		api.DELETE("/tasks/:id", handler.DeleteTask)
-		api.POST("/tasks/:id/execute", handler.ExecuteTask)
+		protected.GET("/tasks", apiHandler.GetTasks)
+		protected.GET("/tasks/:id", apiHandler.GetTask)
+		protected.POST("/tasks", apiHandler.CreateTask)
+		protected.PUT("/tasks/:id", apiHandler.UpdateTask)
+		protected.PATCH("/tasks/:id/enabled", apiHandler.SetTaskEnabled)
+		protected.DELETE("/tasks/:id", apiHandler.DeleteTask)
+		protected.POST("/tasks/:id/execute", apiHandler.ExecuteTask)
 
 		// 日志
-		api.GET("/logs", handler.GetLogs)
+		protected.GET("/logs", apiHandler.GetLogs)
 	}
 
 	// SPA History Mode Fallback
@@ -65,7 +82,7 @@ func setupRoutes(r *gin.Engine) *gin.Engine {
 		path := c.Request.URL.Path
 
 		// 如果是 API 请求，返回 404
-		if strings.HasPrefix(path, "/api/") {
+		if path == "/api" || strings.HasPrefix(path, "/api/") {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 			return
 		}
@@ -81,4 +98,25 @@ func setupRoutes(r *gin.Engine) *gin.Engine {
 	})
 
 	return r
+}
+
+func requestBodyLimit(maxBytes int64) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBytes)
+		c.Next()
+	}
+}
+
+func securityHeaders() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("X-Frame-Options", "DENY")
+		c.Header("Referrer-Policy", "no-referrer")
+		c.Header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		if strings.HasPrefix(c.Request.URL.Path, "/api/") || c.Request.URL.Path == "/api" {
+			c.Header("Cache-Control", "no-store")
+		}
+		c.Header("Content-Security-Policy", "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'")
+		c.Next()
+	}
 }

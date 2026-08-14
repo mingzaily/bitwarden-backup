@@ -2,6 +2,7 @@ package bitwarden
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -39,7 +40,7 @@ func (c *Client) Unlock(ctx context.Context, masterPassword string) error {
 		}
 		// 检测登录状态损坏的情况
 		if strings.Contains(stderr, "not logged in") || strings.Contains(stderr, "You are not logged in") {
-			return &ErrNotLoggedIn{Msg: fmt.Sprintf("unlock failed: %s", stderr)}
+			return &ErrNotLoggedIn{Msg: fmt.Sprintf("unlock failed: %s", sanitizeBWOutput(stderr))}
 		}
 		return fmt.Errorf("unlock failed (exit=%d): %w", res.ExitCode, err)
 	}
@@ -61,9 +62,9 @@ func (c *Client) Unlock(ctx context.Context, masterPassword string) error {
 		}
 
 		// 记录错误到日志
-		errMsg := fmt.Sprintf("unlock returned empty session token (exit=%d); stdout=%s stderr=%s", res.ExitCode, stdout, stderr)
+		errMsg := fmt.Sprintf("unlock returned empty session token (exit=%d); stdout=%s stderr=%s", res.ExitCode, sanitizeBWOutput(stdout), sanitizeBWOutput(stderr))
 		c.AddLog(fmt.Sprintf("ERROR: %s", errMsg))
-		return fmt.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
 	c.sessionToken = token
@@ -90,8 +91,11 @@ func (c *Client) Export(ctx context.Context, outputPath, format string, password
 
 	// 确保输出目录存在
 	dir := filepath.Dir(outputPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+	if err := os.Chmod(dir, 0700); err != nil {
+		return fmt.Errorf("failed to secure output directory: %w", err)
 	}
 
 	// 构建命令参数
@@ -100,12 +104,16 @@ func (c *Client) Export(ctx context.Context, outputPath, format string, password
 		args = append(args, "--session", c.sessionToken)
 	}
 
-	// 如果提供了密码参数，添加 --password 选项
+	// 使用环境变量传递导出密码，避免密码出现在命令行参数和进程列表中。
 	if len(password) > 0 && password[0] != "" {
-		args = append(args, "--password", password[0])
+		args = append(args, "--passwordenv", "BW_EXPORT_PASSWORD")
 	}
 
-	res, err := c.runBW(ctx, args, "", nil)
+	extraEnv := make(map[string]string)
+	if len(password) > 0 && password[0] != "" {
+		extraEnv["BW_EXPORT_PASSWORD"] = password[0]
+	}
+	res, err := c.runBW(ctx, args, "", extraEnv)
 	if err != nil {
 		if strings.TrimSpace(res.Stdout) != "" {
 			c.AddLog(fmt.Sprintf("bw export stdout: %s", strings.TrimSpace(res.Stdout)))
@@ -114,6 +122,9 @@ func (c *Client) Export(ctx context.Context, outputPath, format string, password
 			c.AddLog(fmt.Sprintf("bw export stderr: %s", strings.TrimSpace(res.Stderr)))
 		}
 		return fmt.Errorf("export failed (exit=%d): %w", res.ExitCode, err)
+	}
+	if err := os.Chmod(outputPath, 0600); err != nil {
+		return fmt.Errorf("failed to secure exported file: %w", err)
 	}
 
 	return nil

@@ -1,6 +1,8 @@
 package model
 
 import (
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/mingzaily/bitwarden-backup/internal/crypto"
@@ -50,21 +52,21 @@ func (s *ServerConfig) BeforeSave(tx *gorm.DB) error {
 // AfterFind GORM 钩子：查询后解密敏感字段
 func (s *ServerConfig) AfterFind(tx *gorm.DB) error {
 	if s.ClientID != "" {
-		decrypted, err := crypto.Decrypt(s.ClientID)
+		decrypted, err := decryptSensitive(s.ClientID)
 		if err != nil {
 			return err
 		}
 		s.ClientID = decrypted
 	}
 	if s.ClientSecret != "" {
-		decrypted, err := crypto.Decrypt(s.ClientSecret)
+		decrypted, err := decryptSensitive(s.ClientSecret)
 		if err != nil {
 			return err
 		}
 		s.ClientSecret = decrypted
 	}
 	if s.MasterPassword != "" {
-		decrypted, err := crypto.Decrypt(s.MasterPassword)
+		decrypted, err := decryptSensitive(s.MasterPassword)
 		if err != nil {
 			return err
 		}
@@ -108,4 +110,16 @@ type ServerRequest struct {
 	MasterPassword string `json:"master_password"`
 	IsOfficial     bool   `json:"is_official"`
 	Enabled        *bool  `json:"enabled"`
+}
+
+// IsOfficialServerURL derives the server category from the trusted URL. The
+// client-provided is_official flag is intentionally not used for persistence,
+// so the label cannot drift from the actual Bitwarden endpoint.
+func IsOfficialServerURL(rawURL string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || !strings.EqualFold(parsed.Scheme, "https") {
+		return false
+	}
+	host := strings.TrimSuffix(strings.ToLower(parsed.Hostname()), ".")
+	return host == "vault.bitwarden.com" || host == "vault.bitwarden.eu"
 }

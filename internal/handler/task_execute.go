@@ -2,31 +2,36 @@ package handler
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mingzaily/bitwarden-backup/internal/scheduler"
 )
 
 // ExecuteTask 立即执行备份任务
-func ExecuteTask(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+func (a *API) ExecuteTask(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
 		return
 	}
 
-	task, err := taskSvc.GetByID(uint(id))
+	task, err := a.taskService.GetByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		writeLookupError(c, "task", "load task for execution", err)
+		return
+	}
+	if !task.Enabled {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "task is disabled"})
+		return
+	}
+	if a.scheduler == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "scheduler is unavailable"})
 		return
 	}
 
-	// 在后台执行任务
-	go func() {
-		sched := scheduler.New()
-		sched.ExecuteTaskNow(*task)
-	}()
+	// 复用调度器队列，避免重复请求并发启动多个备份流程。
+	if !a.scheduler.TriggerTask(task.ID) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "task is already running or scheduler queue is full"})
+		return
+	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Task execution started"})
+	c.JSON(http.StatusAccepted, gin.H{"message": "Task execution queued"})
 }

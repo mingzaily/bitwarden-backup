@@ -1,7 +1,6 @@
 package database
 
 import (
-	"encoding/base64"
 	"fmt"
 	"github.com/mingzaily/bitwarden-backup/internal/logger"
 
@@ -38,29 +37,23 @@ func migrateServerConfigs() error {
 		server := &servers[i]
 		needsUpdate := false
 
-		if server.ClientID != "" && !isEncrypted(server.ClientID) {
-			encrypted, err := crypto.Encrypt(server.ClientID)
-			if err != nil {
-				return fmt.Errorf("failed to encrypt ClientID for server %d: %w", server.ID, err)
-			}
+		if encrypted, changed, err := migrateSensitiveValue(server.ClientID); err != nil {
+			return fmt.Errorf("failed to encrypt ClientID for server %d: %w", server.ID, err)
+		} else if changed {
 			server.ClientID = encrypted
 			needsUpdate = true
 		}
 
-		if server.ClientSecret != "" && !isEncrypted(server.ClientSecret) {
-			encrypted, err := crypto.Encrypt(server.ClientSecret)
-			if err != nil {
-				return fmt.Errorf("failed to encrypt ClientSecret for server %d: %w", server.ID, err)
-			}
+		if encrypted, changed, err := migrateSensitiveValue(server.ClientSecret); err != nil {
+			return fmt.Errorf("failed to encrypt ClientSecret for server %d: %w", server.ID, err)
+		} else if changed {
 			server.ClientSecret = encrypted
 			needsUpdate = true
 		}
 
-		if server.MasterPassword != "" && !isEncrypted(server.MasterPassword) {
-			encrypted, err := crypto.Encrypt(server.MasterPassword)
-			if err != nil {
-				return fmt.Errorf("failed to encrypt MasterPassword for server %d: %w", server.ID, err)
-			}
+		if encrypted, changed, err := migrateSensitiveValue(server.MasterPassword); err != nil {
+			return fmt.Errorf("failed to encrypt MasterPassword for server %d: %w", server.ID, err)
+		} else if changed {
 			server.MasterPassword = encrypted
 			needsUpdate = true
 		}
@@ -89,13 +82,24 @@ func migrateBackupDestinations() error {
 		dest := &destinations[i]
 		needsUpdate := false
 
-		if dest.WebDAVPassword != "" && !isEncrypted(dest.WebDAVPassword) {
-			encrypted, err := crypto.Encrypt(dest.WebDAVPassword)
+		fields := []struct {
+			name  string
+			value *string
+		}{
+			{"WebDAVPassword", &dest.WebDAVPassword},
+			{"S3AccessKey", &dest.S3AccessKey},
+			{"S3SecretKey", &dest.S3SecretKey},
+			{"EncryptionPassword", &dest.EncryptionPassword},
+		}
+		for _, field := range fields {
+			encrypted, changed, err := migrateSensitiveValue(*field.value)
 			if err != nil {
-				return fmt.Errorf("failed to encrypt WebDAVPassword for destination %d: %w", dest.ID, err)
+				return fmt.Errorf("failed to encrypt %s for destination %d: %w", field.name, dest.ID, err)
 			}
-			dest.WebDAVPassword = encrypted
-			needsUpdate = true
+			if changed {
+				*field.value = encrypted
+				needsUpdate = true
+			}
 		}
 
 		if needsUpdate {
@@ -109,7 +113,18 @@ func migrateBackupDestinations() error {
 	return nil
 }
 
-func isEncrypted(s string) bool {
-	_, err := base64.StdEncoding.DecodeString(s)
-	return err == nil && len(s) > 50
+func migrateSensitiveValue(value string) (string, bool, error) {
+	if value == "" || crypto.IsEncrypted(value) {
+		return value, false, nil
+	}
+	// Decrypt succeeds for the legacy unprefixed ciphertext. If it fails, the
+	// value is treated as legacy plaintext and encrypted as-is.
+	if plaintext, err := crypto.Decrypt(value); err == nil {
+		value = plaintext
+	}
+	encrypted, err := crypto.Encrypt(value)
+	if err != nil {
+		return "", false, err
+	}
+	return encrypted, true, nil
 }

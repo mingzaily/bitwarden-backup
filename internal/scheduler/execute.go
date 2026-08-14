@@ -2,11 +2,11 @@ package scheduler
 
 import (
 	"fmt"
-	"github.com/mingzaily/bitwarden-backup/internal/logger"
 	"strings"
 	"time"
 
 	"github.com/mingzaily/bitwarden-backup/internal/database"
+	"github.com/mingzaily/bitwarden-backup/internal/logger"
 	"github.com/mingzaily/bitwarden-backup/internal/model"
 )
 
@@ -40,29 +40,36 @@ func (s *Scheduler) AddTask(task model.BackupTask) error {
 	return nil
 }
 
-func (s *Scheduler) enqueueTask(taskID uint) {
+func (s *Scheduler) enqueueTask(taskID uint) bool {
 	if s.stopped.Load() {
-		return
+		return false
 	}
 
 	s.queueMu.Lock()
 	defer s.queueMu.Unlock()
 
 	if s.stopped.Load() {
-		return
+		return false
 	}
 	if s.queuedTasks[taskID] {
 		logger.Module(logger.ModuleScheduler).Info("Task already queued, skipping", "id", taskID)
-		return
+		return false
 	}
 
 	select {
 	case s.taskQueue <- taskID:
 		s.queuedTasks[taskID] = true
 		logger.Module(logger.ModuleScheduler).Info("Task enqueued", "id", taskID)
+		return true
 	default:
 		logger.Module(logger.ModuleScheduler).Warn("Task queue full, dropping task", "id", taskID)
+		return false
 	}
+}
+
+// TriggerTask 将任务加入共享执行队列。队列会按任务 ID 去重，避免重复执行。
+func (s *Scheduler) TriggerTask(taskID uint) bool {
+	return s.enqueueTask(taskID)
 }
 
 func (s *Scheduler) processTask(taskID uint) {

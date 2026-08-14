@@ -23,8 +23,21 @@ func Init(dbPath string, cfg *config.Config) error {
 	}
 
 	dir := filepath.Dir(dbPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return fmt.Errorf("failed to create db directory: %w", err)
+	}
+	if dbPath != ":memory:" {
+		file, err := os.OpenFile(dbPath, os.O_RDWR|os.O_CREATE, 0600)
+		if err != nil {
+			return fmt.Errorf("failed to prepare database file: %w", err)
+		}
+		if err := file.Chmod(0600); err != nil {
+			_ = file.Close()
+			return fmt.Errorf("failed to secure database file: %w", err)
+		}
+		if err := file.Close(); err != nil {
+			return fmt.Errorf("failed to close database file: %w", err)
+		}
 	}
 
 	var logLevel logger.LogLevel
@@ -36,7 +49,10 @@ func Init(dbPath string, cfg *config.Config) error {
 
 	// Critical #3: 启用外键约束，确保引用完整性
 	// 注意：迁移时仍禁用外键以避免顺序问题，迁移完成后启用
-	dsn := dbPath + "?_pragma=foreign_keys(1)"
+	// SQLite is the control-plane database and is accessed by both HTTP
+	// handlers and the scheduler. A busy timeout plus a single pooled
+	// connection keeps short concurrent writes from surfacing as SQLITE_BUSY.
+	dsn := dbPath + "?_pragma=foreign_keys%3d1&_pragma=busy_timeout%3d5000"
 	db, err := gorm.Open(sqlite.Dialector{
 		DriverName: "sqlite",
 		DSN:        dsn,
@@ -47,11 +63,19 @@ func Init(dbPath string, cfg *config.Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect database: %w", err)
 	}
-
+	sqlDB, err := db.DB()
+	if err != nil {
+		return fmt.Errorf("failed to configure database pool: %w", err)
+	}
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
 	DB = db
 
 	if err := autoMigrate(); err != nil {
 		return fmt.Errorf("failed to migrate database: %w", err)
+	}
+	if err := MigrateEncryptExistingData(); err != nil {
+		return fmt.Errorf("failed to encrypt existing data: %w", err)
 	}
 
 	applogger.Module(applogger.ModuleDatabase).Info("Database initialized successfully")

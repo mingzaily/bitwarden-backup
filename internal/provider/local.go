@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/mingzaily/bitwarden-backup/internal/model"
+	"github.com/mingzaily/bitwarden-backup/internal/safety"
 )
 
 // LocalProvider 本地存储提供者
@@ -28,11 +29,18 @@ func (p *LocalProvider) Type() string {
 func (p *LocalProvider) Backup(ctx BackupContext) (string, error) {
 	dest := ctx.Destination
 
-	if err := os.MkdirAll(dest.LocalPath, 0755); err != nil {
+	if dest.LocalPath == "" {
+		return "", fmt.Errorf("local path is empty")
+	}
+	if err := os.MkdirAll(dest.LocalPath, 0700); err != nil {
 		return "", fmt.Errorf("failed to create local directory: %w", err)
 	}
+	if err := os.Chmod(dest.LocalPath, 0700); err != nil {
+		return "", fmt.Errorf("failed to secure local directory: %w", err)
+	}
 
-	targetFile := filepath.Join(dest.LocalPath, fmt.Sprintf("backup_%s_%s.json", ctx.TaskName, ctx.Timestamp))
+	filename := fmt.Sprintf("backup_%s_%s.json", safety.Filename(ctx.TaskName), safety.Filename(ctx.Timestamp))
+	targetFile := filepath.Join(dest.LocalPath, filename)
 
 	source, err := os.Open(ctx.SourceFile)
 	if err != nil {
@@ -40,7 +48,7 @@ func (p *LocalProvider) Backup(ctx BackupContext) (string, error) {
 	}
 	defer source.Close()
 
-	target, err := os.Create(targetFile)
+	target, err := os.OpenFile(targetFile, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		return "", fmt.Errorf("failed to create target file: %w", err)
 	}

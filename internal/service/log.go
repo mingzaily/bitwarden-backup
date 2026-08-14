@@ -22,6 +22,6 @@ func (s *LogService) GetByTaskID(taskID uint) ([]model.BackupLog, error) {
 }
 
 // GetPaginated 分页获取日志
-func (s *LogService) GetPaginated(params model.PaginationParams, taskID *uint) ([]model.BackupLog, int64, error) {
+func (s *LogService) GetPaginated(params model.PaginationParams, taskID *uint) ([]model.LogResponse, int64, error) {
 	return s.repo.FindPaginated(params, taskID)
 }

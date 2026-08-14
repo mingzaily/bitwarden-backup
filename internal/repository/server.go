@@ -34,11 +34,25 @@ func (r *ServerRepository) Update(server *model.ServerConfig) error {
 }
 
 func (r *ServerRepository) UpdateEnabled(id uint, enabled bool) error {
-	return r.db.Model(&model.ServerConfig{}).Where("id = ?", id).Update("enabled", enabled).Error
+	result := r.db.Model(&model.ServerConfig{}).Where("id = ?", id).Update("enabled", enabled)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (r *ServerRepository) Delete(id uint) error {
-	return r.db.Delete(&model.ServerConfig{}, id).Error
+	result := r.db.Delete(&model.ServerConfig{}, id)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 // FindPaginated 分页查询服务器

@@ -6,6 +6,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -13,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/mingzaily/bitwarden-backup/internal/model"
+	"github.com/mingzaily/bitwarden-backup/internal/safety"
 )
 
 // S3Provider S3 存储提供者
@@ -31,9 +33,18 @@ func (p *S3Provider) Type() string {
 // Backup 执行 S3 备份，返回最终存储路径
 func (p *S3Provider) Backup(ctx BackupContext) (string, error) {
 	dest := ctx.Destination
+	if err := validateS3Destination(dest); err != nil {
+		return "", err
+	}
+	parentCtx := ctx.Context
+	if parentCtx == nil {
+		parentCtx = context.Background()
+	}
+	requestCtx, cancel := context.WithTimeout(parentCtx, 5*time.Minute)
+	defer cancel()
 
 	// 创建 S3 客户端配置
-	cfg, err := config.LoadDefaultConfig(context.TODO(),
+	cfg, err := config.LoadDefaultConfig(requestCtx,
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
 			dest.S3AccessKey,
 			dest.S3SecretKey,
@@ -65,10 +76,10 @@ func (p *S3Provider) Backup(ctx BackupContext) (string, error) {
 	if remotePath != "" {
 		remotePath = remotePath + "/"
 	}
-	key := fmt.Sprintf("%sbackup_%s_%s.json", remotePath, ctx.TaskName, ctx.Timestamp)
+	key := fmt.Sprintf("%sbackup_%s_%s.json", remotePath, safety.Filename(ctx.TaskName), safety.Filename(ctx.Timestamp))
 
 	// 上传文件
-	_, err = client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err = client.PutObject(requestCtx, &s3.PutObjectInput{
 		Bucket: aws.String(dest.S3Bucket),
 		Key:    aws.String(key),
 		Body:   file,
@@ -100,7 +111,9 @@ func (p *S3Provider) Cleanup(dest model.BackupDestination, maxCount int) (int, e
 	prefix = prefix + "backup_"
 
 	// 列举对象
-	result, err := client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
+	requestCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	result, err := client.ListObjectsV2(requestCtx, &s3.ListObjectsV2Input{
 		Bucket: aws.String(dest.S3Bucket),
 		Prefix: aws.String(prefix),
 	})
@@ -144,7 +157,7 @@ func (p *S3Provider) Cleanup(dest model.BackupDestination, maxCount int) (int, e
 		return 0, nil
 	}
 
-	_, err = client.DeleteObjects(context.TODO(), &s3.DeleteObjectsInput{
+	_, err = client.DeleteObjects(requestCtx, &s3.DeleteObjectsInput{
 		Bucket: aws.String(dest.S3Bucket),
 		Delete: &types.Delete{Objects: toDelete},
 	})
@@ -157,7 +170,12 @@ func (p *S3Provider) Cleanup(dest model.BackupDestination, maxCount int) (int, e
 
 // createClient 创建 S3 客户端
 func (p *S3Provider) createClient(dest model.BackupDestination) (*s3.Client, error) {
-	cfg, err := config.LoadDefaultConfig(context.TODO(),
+	if err := validateS3Destination(dest); err != nil {
+		return nil, err
+	}
+	requestCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cfg, err := config.LoadDefaultConfig(requestCtx,
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
 			dest.S3AccessKey,
 			dest.S3SecretKey,
@@ -177,4 +195,11 @@ func (p *S3Provider) createClient(dest model.BackupDestination) (*s3.Client, err
 	})
 
 	return client, nil
+}
+
+func validateS3Destination(dest model.BackupDestination) error {
+	if dest.S3Endpoint == "" {
+		return nil
+	}
+	return safety.ValidateURL(dest.S3Endpoint, "s3_endpoint", true)
 }

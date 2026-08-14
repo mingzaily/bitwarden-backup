@@ -1,9 +1,13 @@
 package main
 
 import (
+	"errors"
 	"log/slog"
+	"net/http"
 	"os"
+	"time"
 
+	"github.com/mingzaily/bitwarden-backup/internal/auth"
 	"github.com/mingzaily/bitwarden-backup/internal/config"
 	"github.com/mingzaily/bitwarden-backup/internal/database"
 	"github.com/mingzaily/bitwarden-backup/internal/handler"
@@ -21,6 +25,10 @@ func main() {
 		logLevel = slog.LevelDebug
 	}
 	logger.Init(logLevel)
+	if err := cfg.Validate(); err != nil {
+		logger.Module(logger.ModuleMain).Error("Invalid configuration", "error", err)
+		os.Exit(1)
+	}
 
 	// 初始化数据库
 	if err := database.Init(cfg.DBPath, cfg); err != nil {
@@ -29,7 +37,8 @@ func main() {
 	}
 
 	// 初始化 Handler 层
-	handler.Init(database.DB)
+	apiHandler := handler.New(database.DB)
+	authManager := auth.New(cfg.AdminPassword, cfg.AuthCookieSecure)
 
 	// 初始化调度器
 	sched := scheduler.New()
@@ -40,14 +49,23 @@ func main() {
 	defer sched.Stop()
 
 	// 将调度器注入到 Handler 层，支持动态更新任务
-	handler.SetScheduler(sched)
+	apiHandler.SetScheduler(sched)
 
 	// 初始化 Gin 路由
-	r := setupRouter(cfg)
+	r := setupRouter(cfg, authManager, apiHandler)
 
 	// 启动服务器
 	logger.Module(logger.ModuleMain).Info("Server starting", "port", cfg.ServerPort)
-	if err := r.Run(":" + cfg.ServerPort); err != nil {
+	server := &http.Server{
+		Addr:              ":" + cfg.ServerPort,
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    1 << 20,
+	}
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		logger.Module(logger.ModuleMain).Error("Failed to start server", "error", err)
 		os.Exit(1)
 	}

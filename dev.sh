@@ -27,4 +27,9 @@ echo "🔧 启动 Go 后端服务器..."
 echo ""
 
 # 启动 Go 服务器
+# Go 可能从全局配置文件继承 GOSUMDB=off；本项目依赖自动获取 Go 1.25.13
+# 工具链时需要 checksum 校验。命令行显式传入的值仍优先。
+GOSUMDB="${GOSUMDB:-sum.golang.org}" \
+GOPROXY="${GOPROXY:-https://proxy.golang.org,direct}" \
+GOTOOLCHAIN="${GOTOOLCHAIN:-auto}" \
 go run ./cmd/server

@@ -25,9 +25,9 @@ func (r *LogRepository) FindByTaskID(taskID uint) ([]model.BackupLog, error) {
 	return logs, err
 }
 
-// FindPaginated 分页查询日志
-func (r *LogRepository) FindPaginated(params model.PaginationParams, taskID *uint) ([]model.BackupLog, int64, error) {
-	var logs []model.BackupLog
+// FindPaginated 分页查询日志，并带出所属任务名称。
+func (r *LogRepository) FindPaginated(params model.PaginationParams, taskID *uint) ([]model.LogResponse, int64, error) {
+	var logs []model.LogResponse
 	var total int64
 
 	query := r.db.Model(&model.BackupLog{})
@@ -39,7 +39,14 @@ func (r *LogRepository) FindPaginated(params model.PaginationParams, taskID *uin
 		return nil, 0, err
 	}
 
-	err := query.Order("created_at DESC").
+	listQuery := r.db.Table("backup_logs AS logs").
+		Select("logs.id, logs.task_id, COALESCE(tasks.name, '') AS task_name, logs.status, logs.message, logs.backup_file, logs.execution_logs, logs.start_time, logs.end_time, logs.created_at").
+		Joins("LEFT JOIN backup_tasks AS tasks ON tasks.id = logs.task_id")
+	if taskID != nil {
+		listQuery = listQuery.Where("logs.task_id = ?", *taskID)
+	}
+	err := listQuery.
+		Order("logs.created_at DESC").
 		Offset(params.GetOffset()).
 		Limit(params.GetLimit()).
 		Find(&logs).Error

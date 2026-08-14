@@ -63,20 +63,31 @@ func (r *TaskRepository) Update(task *model.BackupTask) error {
 }
 
 func (r *TaskRepository) UpdateEnabled(id uint, enabled bool) error {
-	return r.db.Model(&model.BackupTask{}).Where("id = ?", id).Update("enabled", enabled).Error
+	result := r.db.Model(&model.BackupTask{}).Where("id = ?", id).Update("enabled", enabled)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (r *TaskRepository) UpdateWithDestinations(task *model.BackupTask, destinationIDs []uint) error {
 	// 开启事务
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		// 只更新指定字段，保留 created_at
-		if err := tx.Model(&model.BackupTask{}).Where("id = ?", task.ID).Updates(map[string]any{
+		result := tx.Model(&model.BackupTask{}).Where("id = ?", task.ID).Updates(map[string]any{
 			"name":             task.Name,
 			"source_server_id": task.SourceServerID,
 			"cron_expression":  task.CronExpression,
 			"enabled":          task.Enabled,
-		}).Error; err != nil {
-			return err
+		})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
 		}
 
 		// 清除旧的关联
@@ -100,7 +111,14 @@ func (r *TaskRepository) UpdateWithDestinations(task *model.BackupTask, destinat
 }
 
 func (r *TaskRepository) Delete(id uint) error {
-	return r.db.Delete(&model.BackupTask{}, id).Error
+	result := r.db.Delete(&model.BackupTask{}, id)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 // FindPaginated 分页查询任务

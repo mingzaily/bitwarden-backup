@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/mingzaily/bitwarden-backup/internal/model"
+	"github.com/mingzaily/bitwarden-backup/internal/safety"
 	"github.com/mingzaily/bitwarden-backup/internal/webdav"
 )
 
@@ -28,7 +29,7 @@ func (p *WebDAVProvider) Backup(ctx BackupContext) (string, error) {
 	dest := ctx.Destination
 
 	client := webdav.NewClient(dest.WebDAVURL, dest.WebDAVUsername, dest.WebDAVPassword)
-	remoteFile := filepath.Join(dest.WebDAVPath, fmt.Sprintf("backup_%s_%s.json", ctx.TaskName, ctx.Timestamp))
+	remoteFile := filepath.Join(dest.WebDAVPath, fmt.Sprintf("backup_%s_%s.json", safety.Filename(ctx.TaskName), safety.Filename(ctx.Timestamp)))
 
 	if err := client.UploadFile(ctx.SourceFile, remoteFile); err != nil {
 		return "", fmt.Errorf("failed to upload to webdav: %w", err)

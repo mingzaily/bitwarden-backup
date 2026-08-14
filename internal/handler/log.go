@@ -2,36 +2,28 @@ package handler
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mingzaily/bitwarden-backup/internal/model"
 )
 
 // GetLogs 获取所有日志（支持分页）
-func GetLogs(c *gin.Context) {
+func (a *API) GetLogs(c *gin.Context) {
 	var params model.PaginationParams
-	if err := c.ShouldBindQuery(&params); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if !bindQuery(c, &params) {
 		return
 	}
 
 	// 解析 task_id 参数
-	var taskID *uint
-	if taskIDStr := c.Query("task_id"); taskIDStr != "" {
-		id, err := strconv.ParseUint(taskIDStr, 10, 32)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid task_id"})
-			return
-		}
-		tid := uint(id)
-		taskID = &tid
+	taskID, ok := parseQueryID(c, "task_id")
+	if !ok {
+		return
 	}
 
 	// 分页查询
-	logs, total, err := logSvc.GetPaginated(params, taskID)
+	logs, total, err := a.logService.GetPaginated(params, taskID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeInternalError(c, "list logs", err)
 		return
 	}
 

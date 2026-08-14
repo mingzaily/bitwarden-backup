@@ -28,15 +28,15 @@ type TaskRequest struct {
 
 // TaskResponse 任务响应 DTO（隐藏敏感数据）
 type TaskResponse struct {
-	ID             uint                    `json:"id"`
-	Name           string                  `json:"name"`
-	SourceServerID uint                    `json:"source_server_id"`
-	CronExpression string                  `json:"cron_expression"`
-	Enabled        bool                    `json:"enabled"`
-	CreatedAt      time.Time               `json:"created_at"`
-	UpdatedAt      time.Time               `json:"updated_at"`
-	SourceServer   ServerResponse          `json:"source_server"`
-	Destinations   []DestinationResponse   `json:"destinations"`
+	ID             uint                  `json:"id"`
+	Name           string                `json:"name"`
+	SourceServerID uint                  `json:"source_server_id"`
+	CronExpression string                `json:"cron_expression"`
+	Enabled        bool                  `json:"enabled"`
+	CreatedAt      time.Time             `json:"created_at"`
+	UpdatedAt      time.Time             `json:"updated_at"`
+	SourceServer   ServerResponse        `json:"source_server"`
+	Destinations   []DestinationResponse `json:"destinations"`
 }
 
 // ToResponse 转换为响应结构

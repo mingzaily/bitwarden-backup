@@ -1,7 +1,7 @@
 # ============================================
 # Stage 1: Frontend Builder
 # ============================================
-FROM --platform=$BUILDPLATFORM node:20-alpine AS frontend-builder
+FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend-builder
 
 WORKDIR /build
 
@@ -9,7 +9,7 @@ WORKDIR /build
 COPY web/package.json web/package-lock.json* ./
 
 # Install dependencies
-RUN npm ci --prefer-offline --no-audit || npm install
+RUN npm ci --prefer-offline --no-audit
 
 # Copy frontend source
 COPY web/ ./
@@ -20,7 +20,7 @@ RUN npm run build
 # ============================================
 # Stage 2: Backend Builder
 # ============================================
-FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS backend-builder
+FROM --platform=$BUILDPLATFORM golang:1.25.13-alpine AS backend-builder
 
 # 接收目标平台参数
 ARG TARGETOS
@@ -49,7 +49,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
 # ============================================
 # Stage 3: Runtime
 # ============================================
-FROM node:20-alpine AS runtime
+FROM node:22-alpine AS runtime
 
 # Install runtime dependencies
 RUN apk add --no-cache \
@@ -90,9 +90,9 @@ ENV APP_ENV=production
 # Expose port
 EXPOSE 8080
 
-# Health check (optional, uses root endpoint)
+# Health check does not require an authenticated browser session.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/servers || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/healthz || exit 1
 
 # Run application
 CMD ["./bitwarden-backup"]

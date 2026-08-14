@@ -16,6 +16,7 @@ const (
 	ModuleScheduler  = "scheduler"
 	ModuleBitwarden  = "bitwarden"
 	ModuleDatabase   = "database"
+	ModuleHandler    = "handler"
 )
 
 var defaultLogger *slog.Logger

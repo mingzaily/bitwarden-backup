@@ -4,16 +4,14 @@ import { ref } from 'vue'
 const toastInstance = ref(null)
 
 export const useToast = () => {
-  if (!toastInstance.value) {
-    console.warn('Toast not initialized')
-    return {
-      success: () => {},
-      error: () => {},
-      warning: () => {},
-      info: () => {}
-    }
+  // Return a lazy proxy so setup() can safely call useToast before the
+  // Teleported ToastContainer has mounted and assigned its component ref.
+  return {
+    success: (...args) => toastInstance.value?.success?.(...args),
+    error: (...args) => toastInstance.value?.error?.(...args),
+    warning: (...args) => toastInstance.value?.warning?.(...args),
+    info: (...args) => toastInstance.value?.info?.(...args)
   }
-  return toastInstance.value
 }
 
 export const setToastInstance = (instance) => {

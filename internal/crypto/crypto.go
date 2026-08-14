@@ -9,11 +9,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"github.com/mingzaily/bitwarden-backup/internal/logger"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/joho/godotenv"
+	"github.com/mingzaily/bitwarden-backup/internal/logger"
 	"golang.org/x/crypto/pbkdf2"
 )
 
@@ -59,7 +60,8 @@ func InitEncryption() error {
 	logger.Module(logger.ModuleEncryption).Info("No master key found, generating new key")
 
 	// 确保 data 目录存在
-	if err := os.MkdirAll("data", 0755); err == nil {
+	if err := os.MkdirAll("data", 0700); err == nil {
+		_ = os.Chmod("data", 0700)
 		masterKey, err = generateAndSaveKey(dataEnvPath)
 		if err == nil {
 			logger.Module(logger.ModuleEncryption).Info("New master key generated and saved", "file", dataEnvPath)
@@ -154,33 +156,37 @@ func generateAndSaveKey(envPath string) (string, error) {
 
 // writeEnvFileSecurely 以安全的方式写入 .env 文件（创建时就设置 0600 权限）
 func writeEnvFileSecurely(envPath string, envMap map[string]string) error {
-	// 创建临时文件，直接设置 0600 权限
-	tmpFile, err := os.OpenFile(envPath+".tmp", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	// 使用随机临时文件名，避免固定 .tmp 路径被符号链接劫持。
+	tmpFile, err := os.CreateTemp(filepath.Dir(envPath), ".bitwarden-backup-env-*.tmp")
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
-	defer tmpFile.Close()
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+	if err := tmpFile.Chmod(0600); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("failed to secure temp file: %w", err)
+	}
 
 	// 写入内容
 	for key, value := range envMap {
 		if _, err := fmt.Fprintf(tmpFile, "%s=\"%s\"\n", key, value); err != nil {
-			os.Remove(envPath + ".tmp")
 			return fmt.Errorf("failed to write to temp file: %w", err)
 		}
 	}
 
 	// 确保数据写入磁盘
 	if err := tmpFile.Sync(); err != nil {
-		os.Remove(envPath + ".tmp")
 		return fmt.Errorf("failed to sync temp file: %w", err)
 	}
 
 	// 关闭临时文件
-	tmpFile.Close()
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("failed to close temp file: %w", err)
+	}
 
 	// 原子性地重命名临时文件为目标文件
-	if err := os.Rename(envPath+".tmp", envPath); err != nil {
-		os.Remove(envPath + ".tmp")
+	if err := os.Rename(tmpPath, envPath); err != nil {
 		return fmt.Errorf("failed to rename temp file: %w", err)
 	}
 

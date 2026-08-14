@@ -2,165 +2,189 @@ package handler
 
 import (
 	"net/http"
-	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mingzaily/bitwarden-backup/internal/model"
 )
 
 // GetDestinations 获取所有备份目标（支持分页）
-func GetDestinations(c *gin.Context) {
+func (a *API) GetDestinations(c *gin.Context) {
 	var params model.PaginationParams
-	if err := c.ShouldBindQuery(&params); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if !bindQuery(c, &params) {
 		return
 	}
 
-	dests, total, err := destinationSvc.GetPaginated(params)
+	destinations, total, err := a.destinationService.GetPaginated(params)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeInternalError(c, "list destinations", err)
 		return
 	}
 
-	// 转换为响应结构
-	responses := make([]model.DestinationResponse, len(dests))
-	for i, d := range dests {
-		responses[i] = d.ToResponse()
+	responses := make([]model.DestinationResponse, len(destinations))
+	for i, destination := range destinations {
+		responses[i] = destination.ToResponse()
 	}
 
-	resp := model.NewPaginatedResponse(responses, params.Page, params.GetLimit(), total)
-	c.JSON(http.StatusOK, resp)
+	response := model.NewPaginatedResponse(responses, params.Page, params.GetLimit(), total)
+	c.JSON(http.StatusOK, response)
 }
 
 // GetDestination 获取单个备份目标
-func GetDestination(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+func (a *API) GetDestination(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
 		return
 	}
-	dest, err := destinationSvc.GetByID(uint(id))
+
+	destination, err := a.destinationService.GetByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Destination not found"})
+		writeLookupError(c, "destination", "load destination", err)
 		return
 	}
-	c.JSON(http.StatusOK, dest.ToResponse())
+	c.JSON(http.StatusOK, destination.ToResponse())
 }
 
 // CreateDestination 创建备份目标
-func CreateDestination(c *gin.Context) {
-	var dest model.BackupDestination
-	if err := c.ShouldBindJSON(&dest); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+func (a *API) CreateDestination(c *gin.Context) {
+	var request model.DestinationRequest
+	if !bindJSON(c, &request) {
 		return
 	}
-	if err := destinationSvc.Create(&dest); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err := validateDestination(request); err != nil {
+		writeBadRequest(c, err.Error())
 		return
 	}
-	// 重新获取以确保数据完整
-	created, _ := destinationSvc.GetByID(dest.ID)
+
+	destination := request.ToDestination()
+	if destination.Type == "server" && !a.validateTargetServer(c, destination.TargetServerID, "target server") {
+		return
+	}
+	if err := a.destinationService.Create(destination); err != nil {
+		writeInternalError(c, "create destination", err)
+		return
+	}
+
+	created, err := a.destinationService.GetByID(destination.ID)
+	if err != nil {
+		writeLookupError(c, "destination", "load created destination", err)
+		return
+	}
 	c.JSON(http.StatusCreated, created.ToResponse())
 }
 
 // UpdateDestination 更新备份目标
-func UpdateDestination(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+func (a *API) UpdateDestination(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+
+	var request model.DestinationRequest
+	if !bindJSON(c, &request) {
+		return
+	}
+	if err := validateDestination(request); err != nil {
+		writeBadRequest(c, err.Error())
+		return
+	}
+
+	destination, err := a.destinationService.GetByID(id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		writeLookupError(c, "destination", "load destination for update", err)
 		return
 	}
 
-	var req model.BackupDestination
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	// The UI sends a masked access key when the key was not changed. Treat it
+	// as omitted instead of persisting the mask as a real credential.
+	if strings.Contains(request.S3AccessKey, "****") {
+		request.S3AccessKey = ""
+	}
+	request.ApplyTo(destination)
+	if destination.Type == "server" && !a.validateTargetServer(c, destination.TargetServerID, "target server") {
 		return
 	}
 
-	// 判断是否仅更新 enabled 状态（前端 toggle 只传 enabled 字段）
-	isToggleOnly := req.Name == "" && req.Type == ""
-
-	if isToggleOnly {
-		if err := destinationSvc.UpdateEnabled(uint(id), req.Enabled); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-	} else {
-		// 获取现有记录
-		existing, err := destinationSvc.GetByID(uint(id))
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Destination not found"})
-			return
-		}
-
-		// 更新非敏感字段
-		existing.Name = req.Name
-		existing.Type = req.Type
-		existing.LocalPath = req.LocalPath
-		existing.WebDAVURL = req.WebDAVURL
-		existing.WebDAVUsername = req.WebDAVUsername
-		existing.WebDAVPath = req.WebDAVPath
-		existing.S3Endpoint = req.S3Endpoint
-		existing.S3Region = req.S3Region
-		existing.S3Bucket = req.S3Bucket
-		existing.S3AccessKey = req.S3AccessKey
-		existing.S3Path = req.S3Path
-		existing.TargetServerID = req.TargetServerID
-		existing.Encrypted = req.Encrypted
-		existing.Enabled = req.Enabled
-	// 更新备份保留份数配置
-		if req.MaxBackupCount < 0 {
-			req.MaxBackupCount = 0
-		}
-		existing.MaxBackupCount = req.MaxBackupCount
-
-
-		// 敏感字段：空值不更新
-		if req.WebDAVPassword != "" {
-			existing.WebDAVPassword = req.WebDAVPassword
-		}
-		if req.S3SecretKey != "" {
-			existing.S3SecretKey = req.S3SecretKey
-		}
-		if req.EncryptionPassword != "" {
-			existing.EncryptionPassword = req.EncryptionPassword
-		}
-
-		if err := destinationSvc.Update(uint(id), existing); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
+	if err := a.destinationService.Update(id, destination); err != nil {
+		writeLookupError(c, "destination", "update destination", err)
+		return
 	}
 
-	// 重新获取更新后的数据
-	updated, _ := destinationSvc.GetByID(uint(id))
+	updated, err := a.destinationService.GetByID(id)
+	if err != nil {
+		writeLookupError(c, "destination", "load updated destination", err)
+		return
+	}
 	c.JSON(http.StatusOK, updated.ToResponse())
 }
 
-// DeleteDestination 删除备份目标
-func DeleteDestination(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+// SetDestinationEnabled updates the destination state without overloading the
+// full destination update contract.
+func (a *API) SetDestinationEnabled(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
 		return
 	}
-	if err := destinationSvc.Delete(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+
+	var request model.EnabledRequest
+	if !bindJSON(c, &request) {
+		return
+	}
+	if request.Enabled == nil {
+		writeBadRequest(c, "enabled is required")
+		return
+	}
+	if err := a.destinationService.UpdateEnabled(id, *request.Enabled); err != nil {
+		writeLookupError(c, "destination", "update destination status", err)
+		return
+	}
+
+	destination, err := a.destinationService.GetByID(id)
+	if err != nil {
+		writeLookupError(c, "destination", "load updated destination", err)
+		return
+	}
+	c.JSON(http.StatusOK, destination.ToResponse())
+}
+
+// DeleteDestination 删除备份目标
+func (a *API) DeleteDestination(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+	if err := a.destinationService.Delete(id); err != nil {
+		writeLookupError(c, "destination", "delete destination", err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Destination deleted"})
 }
 
-// ToggleDestination 切换备份目标启用状态
-func ToggleDestination(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+// ToggleDestination is kept for clients using the original toggle endpoint.
+func (a *API) ToggleDestination(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
 		return
 	}
-	if err := destinationSvc.Toggle(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err := a.destinationService.Toggle(id); err != nil {
+		writeLookupError(c, "destination", "toggle destination", err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Destination toggled"})
+}
+
+func (a *API) validateTargetServer(c *gin.Context, serverID *uint, resource string) bool {
+	if serverID == nil || *serverID == 0 {
+		writeBadRequest(c, resource+" is required")
+		return false
+	}
+	if _, err := a.serverService.GetByID(*serverID); err != nil {
+		if isRecordNotFound(err) {
+			writeBadRequest(c, resource+" not found")
+		} else {
+			writeInternalError(c, "load "+resource, err)
+		}
+		return false
+	}
+	return true
 }

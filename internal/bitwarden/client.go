@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/mingzaily/bitwarden-backup/internal/logger"
+	"github.com/mingzaily/bitwarden-backup/internal/safety"
 )
 
 // bwMu 全局互斥锁，防止并发调用 Bitwarden CLI
@@ -48,6 +49,7 @@ var ansiRegex = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
 // 敏感输出正则表达式（匹配密码提示、输入隐藏等）
 var sensitiveOutputRegex = regexp.MustCompile(`(?im)(?:master\s*password|password:|input\s+is\s+hidden|\[hidden\]|\[input\s+is\s+hidden\]).*`)
+
 // Session token 正则表达式（匹配长字符串）
 var tokenRegex = regexp.MustCompile(`[a-zA-Z0-9+/]{64,}`)
 
@@ -132,7 +134,16 @@ func (c *Client) runBW(ctx context.Context, args []string, stdin string, extraEn
 
 	start := time.Now()
 	cmd := exec.CommandContext(ctx, "bw", args...)
-	cmd.Env = os.Environ()
+	// Do not inherit application secrets into the Bitwarden CLI process. The
+	// individual command receives only the secret it actually needs below.
+	cmd.Env = make([]string, 0, len(os.Environ())+len(extraEnv))
+	for _, entry := range os.Environ() {
+		key, _, ok := strings.Cut(entry, "=")
+		if ok && isSensitiveEnvKey(key) {
+			continue
+		}
+		cmd.Env = append(cmd.Env, entry)
+	}
 	for k, v := range extraEnv {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 	}
@@ -168,6 +179,15 @@ func (c *Client) runBW(ctx context.Context, args []string, stdin string, extraEn
 	return res, err
 }
 
+func isSensitiveEnvKey(key string) bool {
+	switch key {
+	case "BITWARDEN_BACKUP_MASTER_KEY", "BITWARDEN_BACKUP_ADMIN_PASSWORD", "BW_PASSWORD", "BW_SESSION", "BW_CLIENTID", "BW_CLIENTSECRET", "BW_EXPORT_PASSWORD":
+		return true
+	default:
+		return false
+	}
+}
+
 type bwStatusResponse struct {
 	Status string `json:"status"`
 }
@@ -200,6 +220,9 @@ func (c *Client) Status(ctx context.Context) (string, error) {
 
 // ConfigServer 配置服务器地址
 func (c *Client) ConfigServer(ctx context.Context, serverURL string) error {
+	if err := safety.ValidateURL(serverURL, "server_url", true); err != nil {
+		return err
+	}
 	res, err := c.runBW(ctx, []string{"config", "server", serverURL}, "", nil)
 	if err != nil {
 		if strings.TrimSpace(res.Stdout) != "" {

@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/mingzaily/bitwarden-backup/internal/bitwarden"
 	"github.com/mingzaily/bitwarden-backup/internal/database"
@@ -10,7 +11,8 @@ import (
 )
 
 func (s *Scheduler) performMigration(client *bitwarden.Client, targetServerID uint, backupFile string) error {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
 	var targetServer model.ServerConfig
 	if err := database.DB.First(&targetServer, targetServerID).Error; err != nil {
 		return fmt.Errorf("failed to get target server: %w", err)

@@ -12,32 +12,104 @@ type TaskScheduler interface {
 	AddTask(task model.BackupTask) error
 	RemoveTask(taskID uint)
 	UpdateTask(task model.BackupTask) error
+	TriggerTask(taskID uint) bool
 }
 
-var (
-	serverSvc      *service.ServerService
-	destinationSvc *service.DestinationService
-	taskSvc        *service.TaskService
-	logSvc         *service.LogService
-	taskScheduler  TaskScheduler // 任务调度器实例
-)
-
-// Init 初始化所有 handler 依赖
-func Init(db *gorm.DB) {
-	// 初始化 Repository
-	serverRepo := repository.NewServerRepository(db)
-	destRepo := repository.NewDestinationRepository(db)
-	taskRepo := repository.NewTaskRepository(db)
-	logRepo := repository.NewLogRepository(db)
-
-	// 初始化 Service
-	serverSvc = service.NewServerService(serverRepo)
-	destinationSvc = service.NewDestinationService(destRepo)
-	taskSvc = service.NewTaskService(taskRepo)
-	logSvc = service.NewLogService(logRepo)
+// ServerService describes the server operations needed by the HTTP layer.
+// Keeping the dependency as an interface makes handlers independently
+// testable and avoids package-level mutable state.
+type ServerService interface {
+	GetByID(id uint) (*model.ServerConfig, error)
+	GetPaginated(params model.PaginationParams, enabled *bool) ([]model.ServerConfig, int64, error)
+	Create(server *model.ServerConfig) error
+	Update(id uint, server *model.ServerConfig) error
+	UpdateEnabled(id uint, enabled bool) error
+	Delete(id uint) error
 }
 
-// SetScheduler 设置任务调度器实例
-func SetScheduler(s TaskScheduler) {
-	taskScheduler = s
+// DestinationService describes the destination operations needed by handlers.
+type DestinationService interface {
+	GetByID(id uint) (*model.BackupDestination, error)
+	GetPaginated(params model.PaginationParams) ([]model.BackupDestination, int64, error)
+	Create(destination *model.BackupDestination) error
+	Update(id uint, destination *model.BackupDestination) error
+	UpdateEnabled(id uint, enabled bool) error
+	Delete(id uint) error
+	Toggle(id uint) error
+}
+
+// TaskService describes the task operations needed by handlers.
+type TaskService interface {
+	GetByID(id uint) (*model.BackupTask, error)
+	GetPaginated(params model.PaginationParams) ([]model.BackupTask, int64, error)
+	CreateWithDestinations(task *model.BackupTask, destinationIDs []uint) error
+	UpdateEnabled(id uint, enabled bool) error
+	UpdateWithDestinations(id uint, task *model.BackupTask, destinationIDs []uint) error
+	Delete(id uint) error
+}
+
+// LogService describes the log operations needed by handlers.
+type LogService interface {
+	GetPaginated(params model.PaginationParams, taskID *uint) ([]model.LogResponse, int64, error)
+}
+
+// OverviewService describes the aggregate data needed by the dashboard.
+type OverviewService interface {
+	Get() (model.OverviewResponse, error)
+}
+
+// API owns all HTTP-layer dependencies. One instance is created during
+// startup and passed to the router; handlers no longer rely on global state.
+type API struct {
+	serverService      ServerService
+	destinationService DestinationService
+	taskService        TaskService
+	logService         LogService
+	overviewService    OverviewService
+	scheduler          TaskScheduler
+}
+
+// New constructs the HTTP API with the application's default services.
+func New(db *gorm.DB) *API {
+	api := NewWithDependencies(
+		service.NewServerService(repository.NewServerRepository(db)),
+		service.NewDestinationService(repository.NewDestinationRepository(db)),
+		service.NewTaskService(repository.NewTaskRepository(db)),
+		service.NewLogService(repository.NewLogRepository(db)),
+		nil,
+	)
+	api.SetOverviewService(service.NewOverviewService(repository.NewOverviewRepository(db)))
+	return api
+}
+
+// NewWithDependencies constructs an API with explicit dependencies. It is
+// useful for focused handler tests and for embedding the application.
+func NewWithDependencies(
+	serverService ServerService,
+	destinationService DestinationService,
+	taskService TaskService,
+	logService LogService,
+	scheduler TaskScheduler,
+) *API {
+	return &API{
+		serverService:      serverService,
+		destinationService: destinationService,
+		taskService:        taskService,
+		logService:         logService,
+		scheduler:          scheduler,
+	}
+}
+
+// SetScheduler sets the scheduler used by task mutation and execution
+// handlers. The setter is kept small because the scheduler starts after the
+// API is constructed during application startup.
+func (a *API) SetScheduler(scheduler TaskScheduler) {
+	a.scheduler = scheduler
+}
+
+// SetOverviewService injects the aggregate read service used by the home
+// dashboard. It remains a setter so existing handler tests and embedders that
+// use NewWithDependencies do not need to construct an overview dependency.
+func (a *API) SetOverviewService(overviewService OverviewService) {
+	a.overviewService = overviewService
 }
