@@ -9,7 +9,7 @@ services:
       - ./data:/app/data
       - ./backups:/app/backups
     environment:
-      # 必填：通过宿主机环境变量提供至少 12 位的随机管理员密码
+      # 必填：通过宿主机环境变量提供至少 8 位的随机管理员密码
       BITWARDEN_BACKUP_ADMIN_PASSWORD: "${BITWARDEN_BACKUP_ADMIN_PASSWORD:?Set BITWARDEN_BACKUP_ADMIN_PASSWORD before starting}"
       # 如果通过 HTTPS 反向代理访问，请设置为 true
       # AUTH_COOKIE_SECURE: "true"
