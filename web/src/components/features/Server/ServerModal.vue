@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="modal-backdrop" @click.self="$emit('close')">
+    <div class="modal-backdrop" @click.self.stop>
       <div class="modal-panel" role="dialog" aria-modal="true" :aria-label="server ? '编辑源站' : '新建源站'">
         <div class="modal-header">
           <div>
@@ -42,14 +42,20 @@
                 <input id="client-id" v-model="formData.client_id" class="input" type="text" required autocomplete="off" placeholder="user.xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
               </div>
               <div class="field">
-                <label class="field-label" for="client-secret">Client Secret <span v-if="server">可选</span></label>
+                <div class="field-label-row">
+                  <label class="field-label" for="client-secret">Client Secret</label>
+                  <span v-if="server" class="field-label-note">可选</span>
+                </div>
                 <input id="client-secret" v-model="formData.client_secret" class="input" type="password" :required="!server" autocomplete="new-password" :placeholder="server ? '留空保持原值' : '输入 Client Secret'" />
                 <p v-if="server" class="field-hint">留空表示不修改当前凭证。</p>
               </div>
               <div class="field">
-                <label class="field-label" for="master-password">Master Password <span>用于解锁保险库</span></label>
+                <div class="field-label-row">
+                  <label class="field-label" for="master-password">Master Password</label>
+                  <span class="field-label-note">用于解锁保险库</span>
+                </div>
                 <input id="master-password" v-model="formData.master_password" class="input" type="password" :required="!server" autocomplete="new-password" :placeholder="server ? '留空保持原值' : '输入 Master Password'" />
-                <p class="field-hint">{{ server ? '留空表示不修改当前凭证。' : '备份时会通过 Bitwarden CLI 解锁保险库。' }}</p>
+                <p class="field-hint">{{ server ? '留空表示不修改当前密码；填写后将替换。' : '备份时通过 Bitwarden CLI 解锁 Bitwarden 保险库。' }}</p>
               </div>
             </div>
           </section>

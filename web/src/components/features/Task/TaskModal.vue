@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="modal-backdrop" @click.self="$emit('close')">
+    <div class="modal-backdrop" @click.self.stop>
       <div class="modal-panel modal-panel-wide" role="dialog" aria-modal="true" :aria-label="task ? '编辑任务' : '新建任务'">
         <div class="modal-header">
           <div>

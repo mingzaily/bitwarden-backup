@@ -38,10 +38,18 @@
             <p class="mt-3 text-sm leading-6 text-muted">输入管理员密码，继续管理你的备份工作区。</p>
             <label class="mt-8 block text-sm font-medium text-muted" for="admin-password">管理员密码</label>
             <div class="relative mt-2">
-              <input id="admin-password" v-model="password" class="input pr-12" type="password" autocomplete="current-password" autofocus placeholder="输入密码" />
-              <span class="pointer-events-none absolute inset-y-0 right-4 grid place-items-center text-subtle">
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z M3.5 12s3.1-5 8.5-5 8.5 5 8.5 5-3.1 5-8.5 5-8.5-5-8.5-5Z" /></svg>
-              </span>
+              <input id="admin-password" v-model="password" class="input pr-12" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" autofocus placeholder="输入密码" />
+              <button
+                type="button"
+                class="absolute inset-y-1 right-1 grid w-10 place-items-center rounded-lg text-subtle transition hover:bg-surface-hover hover:text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                :aria-label="showPassword ? '隐藏密码' : '显示密码'"
+                :aria-pressed="showPassword"
+                :title="showPassword ? '隐藏密码' : '显示密码'"
+                @click="showPassword = !showPassword"
+              >
+                <svg v-if="showPassword" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M3.5 12s3.1-5 8.5-5c1.35 0 2.57.3 3.63.73M20.5 12s-3.1 5-8.5 5c-1.35 0-2.57-.3-3.63-.73M9.88 9.88a3 3 0 1 0 4.24 4.24M4 4l16 16" /></svg>
+                <svg v-else class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z M3.5 12s3.1-5 8.5-5 8.5 5 8.5 5-3.1 5-8.5 5-8.5-5-8.5-5Z" /></svg>
+              </button>
             </div>
             <p v-if="loginError" class="mt-3 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">{{ loginError }}</p>
             <button class="btn-primary mt-6 w-full justify-center" :disabled="loggingIn || !password">
@@ -116,6 +124,7 @@ const toastRef = ref(null)
 const booting = ref(true)
 const authenticated = ref(false)
 const password = ref('')
+const showPassword = ref(false)
 const loggingIn = ref(false)
 const loginError = ref('')
 const theme = ref(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark')
@@ -152,6 +161,7 @@ const handleLogin = async () => {
     await authApi.login(password.value)
     authenticated.value = true
     password.value = ''
+    showPassword.value = false
   } catch (error) {
     loginError.value = error.message || '登录失败，请稍后重试'
   } finally {

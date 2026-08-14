@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="modal-backdrop" @click.self="$emit('close')">
+    <div class="modal-backdrop" @click.self.stop>
       <div class="modal-panel modal-panel-wide" role="dialog" aria-modal="true" :aria-label="destination ? '编辑存储目标' : '新建存储目标'">
         <div class="modal-header">
           <div>
