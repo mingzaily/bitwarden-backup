@@ -19,6 +19,11 @@
             <span class="text-xs text-muted">{{ formatTime(log.created_at) }}</span>
           </div>
 
+          <div v-if="log.message" class="surface-muted rounded-xl px-4 py-3">
+            <p class="text-xs font-semibold text-muted">执行摘要</p>
+            <p class="mt-1 break-all text-sm leading-6 text-main">{{ log.message === 'Backup completed successfully' ? '备份成功' : log.message }}</p>
+          </div>
+
           <div v-if="log.backup_file" class="log-file">
             <div class="mb-1 flex items-center gap-2 font-sans text-xs font-semibold text-accent"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.6a1 1 0 0 1 .7.3l5.4 5.4a1 1 0 0 1 .3.7V19a2 2 0 0 1-2 2Z" /></svg>备份文件</div>
             {{ log.backup_file }}

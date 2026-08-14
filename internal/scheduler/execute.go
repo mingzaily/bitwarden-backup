@@ -148,7 +148,9 @@ func (s *Scheduler) executeTask(task model.BackupTask) {
 
 	endTime := time.Now()
 	backupLog.Status = "success"
-	backupLog.Message = "Backup completed successfully"
+	if backupLog.Message == "" {
+		backupLog.Message = "Backup completed successfully"
+	}
 	backupLog.EndTime = &endTime
 	database.DB.Save(&backupLog)
 	logger.Module(logger.ModuleScheduler).Info("Task completed successfully", "name", task.Name)

@@ -2,7 +2,7 @@ package provider
 
 import (
 	"fmt"
-	"path/filepath"
+	"path"
 	"sort"
 	"strings"
 
@@ -29,7 +29,7 @@ func (p *WebDAVProvider) Backup(ctx BackupContext) (string, error) {
 	dest := ctx.Destination
 
 	client := webdav.NewClient(dest.WebDAVURL, dest.WebDAVUsername, dest.WebDAVPassword)
-	remoteFile := filepath.Join(dest.WebDAVPath, fmt.Sprintf("backup_%s_%s.json", safety.Filename(ctx.TaskName), safety.Filename(ctx.Timestamp)))
+	remoteFile := path.Join(dest.WebDAVPath, fmt.Sprintf("backup_%s_%s.json", safety.Filename(ctx.TaskName), safety.Filename(ctx.Timestamp)))
 
 	if err := client.UploadFile(ctx.SourceFile, remoteFile); err != nil {
 		return "", fmt.Errorf("failed to upload to webdav: %w", err)
@@ -75,7 +75,7 @@ func (p *WebDAVProvider) Cleanup(dest model.BackupDestination, maxCount int) (in
 	// 删除超出数量的旧文件
 	deleted := 0
 	for i := maxCount; i < len(backups); i++ {
-		remotePath := filepath.Join(dest.WebDAVPath, backups[i].Name)
+		remotePath := path.Join(dest.WebDAVPath, backups[i].Name)
 		if err := client.Delete(remotePath); err != nil {
 			continue
 		}

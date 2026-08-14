@@ -1,6 +1,17 @@
 package webdav
 
-import "testing"
+import (
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+)
 
 func TestRequestURLJoinsBaseAndRemotePath(t *testing.T) {
 	client := NewClient("https://dav.example.test/root/", "user", "password")
@@ -28,5 +39,117 @@ func TestRequestURLRejectsInsecureRemoteBase(t *testing.T) {
 	client := NewClient("http://dav.example.test/root", "user", "password")
 	if _, err := client.requestURL("backup.zip"); err == nil {
 		t.Fatal("requestURL accepted a non-loopback HTTP base URL")
+	}
+}
+
+func TestUploadFileCreatesMissingRemoteDirectories(t *testing.T) {
+	tempDir := t.TempDir()
+	localPath := filepath.Join(tempDir, "backup.json")
+	wantBody := `{"backup":true}`
+	if err := os.WriteFile(localPath, []byte(wantBody), 0600); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	collections := map[string]bool{"/dav/": true}
+	var requests []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if user, password, ok := r.BasicAuth(); !ok || user != "user" || password != "password" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		requests = append(requests, r.Method+" "+r.URL.Path)
+
+		switch r.Method {
+		case "PROPFIND":
+			if !collections[r.URL.Path] {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			w.WriteHeader(http.StatusMultiStatus)
+		case "MKCOL":
+			parent := path.Dir(strings.TrimSuffix(r.URL.Path, "/")) + "/"
+			if !collections[parent] {
+				w.WriteHeader(http.StatusConflict)
+				return
+			}
+			collections[r.URL.Path] = true
+			w.WriteHeader(http.StatusCreated)
+		case "PUT":
+			parent := path.Dir(r.URL.Path) + "/"
+			if !collections[parent] {
+				w.WriteHeader(http.StatusConflict)
+				return
+			}
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Errorf("failed to read uploaded body: %v", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			if string(body) != wantBody {
+				t.Errorf("uploaded body = %q, want %q", body, wantBody)
+			}
+			if r.ContentLength != int64(len(wantBody)) {
+				t.Errorf("Content-Length = %d, want %d", r.ContentLength, len(wantBody))
+			}
+			if got := r.Header.Get("Content-Type"); got != "application/octet-stream" {
+				t.Errorf("Content-Type = %q, want application/octet-stream", got)
+			}
+			w.WriteHeader(http.StatusCreated)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL+"/dav/", "user", "password")
+	if err := client.UploadFile(localPath, "/nested/deep/backup.json"); err != nil {
+		t.Fatalf("UploadFile returned error: %v", err)
+	}
+
+	wantRequests := []string{
+		"PROPFIND /dav/nested/",
+		"MKCOL /dav/nested/",
+		"PROPFIND /dav/nested/deep/",
+		"MKCOL /dav/nested/deep/",
+		"PUT /dav/nested/deep/backup.json",
+	}
+	if !reflect.DeepEqual(requests, wantRequests) {
+		t.Fatalf("requests = %v, want %v", requests, wantRequests)
+	}
+}
+
+func TestUploadFileIncludesWebDAVResponseBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "PUT" {
+			w.WriteHeader(http.StatusConflict)
+			_, _ = io.WriteString(w, "<D:error>parent collection missing</D:error>")
+			return
+		}
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}))
+	defer server.Close()
+
+	tempDir := t.TempDir()
+	localPath := filepath.Join(tempDir, "backup.json")
+	if err := os.WriteFile(localPath, []byte("backup"), 0600); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	client := NewClient(server.URL+"/dav/", "user", "password")
+	err := client.UploadFile(localPath, "backup.json")
+	if err == nil {
+		t.Fatal("UploadFile returned nil for a 409 response")
+	}
+	if !strings.Contains(err.Error(), "status 409") || !strings.Contains(err.Error(), "parent collection missing") {
+		t.Fatalf("UploadFile error = %q, want status and response body", err)
+	}
+}
+
+func TestResponseErrorWithoutBody(t *testing.T) {
+	resp := &http.Response{StatusCode: http.StatusConflict, Body: io.NopCloser(strings.NewReader(""))}
+	err := responseError("upload", resp)
+	if got, want := err.Error(), fmt.Sprintf("upload failed with status %d", http.StatusConflict); got != want {
+		t.Fatalf("responseError() = %q, want %q", got, want)
 	}
 }

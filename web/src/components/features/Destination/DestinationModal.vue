@@ -43,8 +43,9 @@
 
             <div v-if="formData.type === 'local'" class="field">
               <label class="field-label" for="local-path">本地路径</label>
-              <input id="local-path" v-model="formData.local_path" class="input" type="text" required placeholder="/data/backups" />
-              <p class="field-hint">请填写绝对路径，例如 <code>/app/backups</code> 或 <code>D:/backups</code>。</p>
+              <input id="local-path" v-model="formData.local_path" class="input" type="text" required placeholder="/app/backups" />
+              <p class="field-hint">Docker 部署建议填写 <code>/app/backups</code>，并将宿主机目录挂载到此容器路径。</p>
+              <p class="field-hint mt-1 text-muted">例如 <code>-v /data/backups:/app/backups</code>；非 Docker 部署请填写运行服务所在机器的绝对路径。</p>
             </div>
 
             <div v-else-if="formData.type === 'webdav'" class="grid gap-4">
@@ -67,6 +68,7 @@
                 <label class="field-label" for="webdav-path">存储路径 <span>可选</span></label>
                 <input id="webdav-path" v-model="formData.webdav_path" class="input" type="text" placeholder="/bitwarden-backup" />
                 <p class="field-hint">留空会使用默认路径 <code>/bitwarden-backup</code>。</p>
+                <p class="field-hint mt-1 text-muted">首次备份时会自动创建缺失目录。</p>
               </div>
             </div>
 

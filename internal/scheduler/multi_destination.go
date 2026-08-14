@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mingzaily/bitwarden-backup/internal/bitwarden"
@@ -185,7 +186,7 @@ func (s *Scheduler) performBackupToDestinations(task model.BackupTask, backupLog
 
 	var backupPaths []string
 	var successCount, failCount int
-	var lastErr error
+	var destinationErrors []string
 
 	for _, dest := range task.Destinations {
 		if !dest.Enabled {
@@ -200,7 +201,7 @@ func (s *Scheduler) performBackupToDestinations(task model.BackupTask, backupLog
 		targetPath, err := s.backupToDestination(ctx, dest, sourceFile, task.Name, timestamp)
 		if err != nil {
 			failCount++
-			lastErr = err
+			destinationErrors = append(destinationErrors, fmt.Sprintf("%s: %v", dest.Name, err))
 			logger.Module(logger.ModuleScheduler).Error("Failed to backup to destination", "destination", dest.Name, "error", err)
 		} else if targetPath != "" {
 			successCount++
@@ -215,9 +216,13 @@ func (s *Scheduler) performBackupToDestinations(task model.BackupTask, backupLog
 
 	client.Logout(ctx)
 
+	if failCount > 0 {
+		backupLog.Message = fmt.Sprintf("Backup completed with destination errors: %s", strings.Join(destinationErrors, "; "))
+	}
+
 	// 全部目标失败时返回错误
 	if successCount == 0 && failCount > 0 {
-		return fmt.Errorf("all %d backup destinations failed, last error: %w", failCount, lastErr)
+		return fmt.Errorf("all %d backup destinations failed: %s", failCount, strings.Join(destinationErrors, "; "))
 	}
 
 	return nil

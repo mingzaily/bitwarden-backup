@@ -19,7 +19,94 @@ var httpClient = &http.Client{
 	Timeout: 60 * time.Second,
 }
 
-const maxPropfindResponse = 4 << 20
+const (
+	maxPropfindResponse = 4 << 20
+	maxErrorResponse    = 64 << 10
+)
+
+// responseError converts a non-success WebDAV response into a bounded error.
+// Providers include this error in task execution logs, so keep the response
+// body useful for diagnosis without allowing a remote server to flood logs.
+func responseError(action string, resp *http.Response) error {
+	body, readErr := io.ReadAll(io.LimitReader(resp.Body, maxErrorResponse+1))
+	detail := strings.Join(strings.Fields(string(body)), " ")
+	if len(detail) > maxErrorResponse {
+		detail = detail[:maxErrorResponse] + "…"
+	}
+	if readErr != nil {
+		return fmt.Errorf("%s failed with status %d (read response: %w)", action, resp.StatusCode, readErr)
+	}
+	if detail == "" {
+		return fmt.Errorf("%s failed with status %d", action, resp.StatusCode)
+	}
+	return fmt.Errorf("%s failed with status %d: %s", action, resp.StatusCode, detail)
+}
+
+// ensureDirectory creates each missing collection in a remote path. WebDAV
+// servers are not required to create intermediate collections as a side
+// effect of PUT, and many providers return 409 when the parent is missing.
+func (c *Client) ensureDirectory(remotePath string) error {
+	cleanPath := strings.Trim(remotePath, "/")
+	if cleanPath == "" {
+		return nil
+	}
+
+	current := ""
+	for _, segment := range strings.Split(cleanPath, "/") {
+		current = path.Join(current, segment)
+		if err := c.ensureCollection(current); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Client) ensureCollection(remotePath string) error {
+	collectionPath := strings.TrimSuffix(remotePath, "/") + "/"
+	fullURL, err := c.requestURL(collectionPath)
+	if err != nil {
+		return err
+	}
+
+	probe, err := http.NewRequest("PROPFIND", fullURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create directory check request: %w", err)
+	}
+	probe.SetBasicAuth(c.username, c.password)
+	probe.Header.Set("Depth", "0")
+
+	resp, err := httpClient.Do(probe)
+	if err != nil {
+		return fmt.Errorf("failed to check WebDAV directory: %w", err)
+	}
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusMultiStatus {
+		resp.Body.Close()
+		return nil
+	}
+	if resp.StatusCode != http.StatusNotFound {
+		defer resp.Body.Close()
+		return responseError("WebDAV directory check", resp)
+	}
+	resp.Body.Close()
+
+	create, err := http.NewRequest("MKCOL", fullURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create directory request: %w", err)
+	}
+	create.SetBasicAuth(c.username, c.password)
+
+	resp, err = httpClient.Do(create)
+	if err != nil {
+		return fmt.Errorf("failed to create WebDAV directory: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusMethodNotAllowed {
+		// 405 commonly means another worker created the collection between the
+		// PROPFIND and MKCOL requests. The following PUT will verify usability.
+		return nil
+	}
+	return responseError("WebDAV directory creation", resp)
+}
 
 func (c *Client) requestURL(remotePath string) (string, error) {
 	base, err := url.Parse(c.baseURL)
@@ -54,6 +141,17 @@ func (c *Client) UploadFile(localPath, remotePath string) error {
 		return fmt.Errorf("failed to open file: %w", err)
 	}
 	defer file.Close()
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to stat file: %w", err)
+	}
+
+	parentPath := path.Dir(remotePath)
+	if parentPath != "." && parentPath != "/" {
+		if err := c.ensureDirectory(parentPath); err != nil {
+			return fmt.Errorf("failed to prepare WebDAV directory %q: %w", parentPath, err)
+		}
+	}
 
 	// 构建完整的远程路径
 	fullURL, err := c.requestURL(remotePath)
@@ -69,6 +167,8 @@ func (c *Client) UploadFile(localPath, remotePath string) error {
 
 	// 设置认证
 	req.SetBasicAuth(c.username, c.password)
+	req.ContentLength = fileInfo.Size()
+	req.Header.Set("Content-Type", "application/octet-stream")
 
 	// 发送请求
 	resp, err := httpClient.Do(req)
@@ -79,7 +179,7 @@ func (c *Client) UploadFile(localPath, remotePath string) error {
 
 	// 检查响应状态
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("upload failed with status: %d", resp.StatusCode)
+		return responseError("WebDAV upload", resp)
 	}
 
 	return nil
@@ -136,7 +236,7 @@ func (c *Client) ListFiles(remotePath string) ([]FileInfo, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusMultiStatus && resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("list failed with status: %d", resp.StatusCode)
+		return nil, responseError("WebDAV list", resp)
 	}
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxPropfindResponse+1))
@@ -194,7 +294,7 @@ func (c *Client) Delete(remotePath string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("delete failed with status: %d", resp.StatusCode)
+		return responseError("WebDAV delete", resp)
 	}
 
 	return nil
