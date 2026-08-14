@@ -62,6 +62,36 @@ jobs:
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "previous_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
 
+      - name: Prepare release summary
+        id: notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          PREVIOUS_TAG: ${{ steps.version.outputs.previous_tag }}
+          REPO: ${{ github.repository }}
+        run: |
+          SUMMARY_FILE="$RUNNER_TEMP/release-summary.md"
+          {
+            echo "## 变更摘要"
+            if [ "$PREVIOUS_TAG" = "v0.0.0" ]; then
+              git log --no-merges --format='- %s'
+            else
+              git log --no-merges --format='- %s' "${PREVIOUS_TAG}..HEAD"
+            fi
+            echo
+            echo "---"
+            echo "### 🐳 Docker 镜像"
+            echo
+            echo '```bash'
+            echo "docker pull ghcr.io/${REPO}:${VERSION}"
+            echo '```'
+            echo
+            echo "或使用 latest 标签："
+            echo '```bash'
+            echo "docker pull ghcr.io/${REPO}:latest"
+            echo '```'
+          } > "$SUMMARY_FILE"
+          echo "summary_file=$SUMMARY_FILE" >> "$GITHUB_OUTPUT"
+
       - name: Create and push tag
         run: |
           git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
@@ -70,39 +100,19 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          NOTES_FILE: ${{ steps.notes.outputs.summary_file }}
         run: |
+          notes="$(<"$NOTES_FILE")"
           if [ "${{ steps.version.outputs.previous_tag }}" = "v0.0.0" ]; then
             # 首次发布，不指定 previous tag
             gh release create "v${{ steps.version.outputs.version }}" \
               --title "v${{ steps.version.outputs.version }}" \
+              --notes "$notes" \
               --generate-notes
           else
             gh release create "v${{ steps.version.outputs.version }}" \
               --title "v${{ steps.version.outputs.version }}" \
+              --notes "$notes" \
               --generate-notes \
               --notes-start-tag "${{ steps.version.outputs.previous_tag }}"
           fi
-
-      - name: Append Docker Info
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
-          REPO: ${{ github.repository }}
-        run: |
-          # 获取现有的 release body 到临时文件
-          gh release view "v${VERSION}" --json body -q .body > /tmp/release_body.md
-          # 追加 Docker 信息
-          echo "" >> /tmp/release_body.md
-          echo "---" >> /tmp/release_body.md
-          echo "### 🐳 Docker 镜像" >> /tmp/release_body.md
-          echo "" >> /tmp/release_body.md
-          echo '```bash' >> /tmp/release_body.md
-          echo "docker pull ghcr.io/${REPO}:${VERSION}" >> /tmp/release_body.md
-          echo '```' >> /tmp/release_body.md
-          echo "" >> /tmp/release_body.md
-          echo "或使用 latest 标签：" >> /tmp/release_body.md
-          echo '```bash' >> /tmp/release_body.md
-          echo "docker pull ghcr.io/${REPO}:latest" >> /tmp/release_body.md
-          echo '```' >> /tmp/release_body.md
-          # 更新 release
-          gh release edit "v${VERSION}" --notes-file /tmp/release_body.md
