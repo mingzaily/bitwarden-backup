@@ -64,6 +64,10 @@ export const authApi = {
   }
 }
 
+export const metaApi = {
+  get: () => request('/meta')
+}
+
 export const overviewApi = {
   get: () => request('/overview')
 }
@@ -92,6 +96,7 @@ export const destinationsApi = {
   getById: (id) => request(`/destinations/${id}`),
   create: (data) => request('/destinations', { method: 'POST', body: JSON.stringify(data) }),
   update: (id, data) => request(`/destinations/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  test: (id) => request(`/destinations/${id}/test`, { method: 'POST' }),
   setEnabled: (id, enabled) => request(`/destinations/${id}/enabled`, { method: 'PATCH', body: JSON.stringify({ enabled }) }),
   delete: (id) => request(`/destinations/${id}`, { method: 'DELETE' }),
   toggle: (id) => request(`/destinations/${id}/toggle`, { method: 'PATCH' })
@@ -108,5 +113,6 @@ export const tasksApi = {
 }
 
 export const logsApi = {
-  getAll: (params = {}) => request(paginatedPath('logs', params))
+  getAll: (params = {}) => request(paginatedPath('logs', params)),
+  deleteMany: (ids) => request('/logs', { method: 'DELETE', body: JSON.stringify({ ids }) })
 }

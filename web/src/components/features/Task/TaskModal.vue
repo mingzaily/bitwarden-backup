@@ -22,6 +22,11 @@
               <label class="field-label" for="task-name">任务名称</label>
               <input id="task-name" v-model.trim="formData.name" class="input" type="text" required placeholder="例如：每日备份" />
             </div>
+            <div class="field">
+              <label class="field-label" for="filename-template">备份文件名模板</label>
+              <input id="filename-template" v-model.trim="formData.filename_template" class="input mono" type="text" required placeholder="bitwarden_encrypted_export_{time}.json" aria-describedby="filename-template-hint" />
+              <p id="filename-template-hint" class="field-hint">默认生成 <code>bitwarden_encrypted_export_20251204092928.json</code>；支持 <code>{time}</code>、<code>{task_name}</code>、<code>{medium}</code>（local / webdav / oss），必须包含 <code>{time}</code>。</p>
+            </div>
             <div v-if="task" class="surface-muted flex items-center justify-between gap-4 p-3">
               <div>
                 <p class="text-sm font-semibold text-main">任务状态</p>
@@ -147,7 +152,8 @@ const emit = defineEmits(['close', 'saved'])
 const toast = useToast()
 const servers = ref([])
 const destinations = ref([])
-const emptyForm = () => ({ name: '', cron_expression: '', source_server_id: '', destination_ids: [], enabled: true })
+const DEFAULT_FILENAME_TEMPLATE = 'bitwarden_encrypted_export_{time}.json'
+const emptyForm = () => ({ name: '', cron_expression: '', filename_template: DEFAULT_FILENAME_TEMPLATE, source_server_id: '', destination_ids: [], enabled: true })
 const formData = ref(emptyForm())
 const loading = ref(false)
 const scheduleMode = ref('manual')
@@ -181,10 +187,11 @@ const destinationOptions = computed(() => {
 
 watch(() => props.task, (newTask) => {
   if (newTask) {
-    formData.value = {
-      name: newTask.name || '',
-      cron_expression: newTask.cron_expression || '',
-      source_server_id: newTask.source_server?.id || newTask.source_server_id || '',
+      formData.value = {
+        name: newTask.name || '',
+        cron_expression: newTask.cron_expression || '',
+        filename_template: newTask.filename_template || DEFAULT_FILENAME_TEMPLATE,
+        source_server_id: newTask.source_server?.id || newTask.source_server_id || '',
       destination_ids: Array.isArray(newTask.destinations) ? newTask.destinations.map(destination => destination.id) : (newTask.destination_ids || []),
       enabled: newTask.enabled ?? true
     }
@@ -252,6 +259,15 @@ const handleSubmit = async () => {
   }
   if (!formData.value.source_server_id) {
     toast.error('请选择 Bitwarden 源站')
+    return
+  }
+  const filenameTemplate = formData.value.filename_template.trim()
+  if (!filenameTemplate.includes('{time}')) {
+    toast.error('文件名模板必须包含 {time}')
+    return
+  }
+  if (!filenameTemplate.toLowerCase().endsWith('.json')) {
+    toast.error('文件名模板必须以 .json 结尾')
     return
   }
   if (!formData.value.destination_ids || formData.value.destination_ids.length === 0) {

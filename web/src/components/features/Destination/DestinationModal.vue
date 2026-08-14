@@ -128,7 +128,7 @@
             <div class="surface-muted flex items-center justify-between gap-4 p-3">
               <div>
                 <p class="text-sm font-semibold text-main">限制保留数量</p>
-                <p class="mt-1 text-xs text-muted">超过数量后自动删除最旧的备份文件。</p>
+                <p class="mt-1 text-xs text-muted">当前任务在此目标上的备份超过数量后，自动删除最旧文件。</p>
               </div>
               <ToggleButton v-model="retentionEnabled" label="启用" aria-label="限制保留数量" />
             </div>
@@ -138,7 +138,7 @@
                 <input id="max-backup-count" v-model.number="formData.max_backup_count" class="input pr-12" type="number" min="1" placeholder="5" />
                 <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-semibold text-muted">份</span>
               </div>
-              <p class="field-hint text-warning">超过限制时会自动删除最旧的备份文件。</p>
+              <p class="field-hint text-warning">按当前任务的文件名模板匹配，超过限制后删除最旧文件。</p>
             </div>
             <p v-else class="field-hint">当前保留所有历史备份文件，不限制数量。</p>
           </section>

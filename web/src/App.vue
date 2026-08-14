@@ -15,9 +15,14 @@
           <div class="absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-violet/15 blur-3xl"></div>
           <div class="relative flex h-full flex-col justify-between">
             <div>
-              <div class="mb-10 flex items-center gap-3">
+              <div class="brand-lockup mb-10">
                 <div class="brand-mark"><span class="brand-mark-core"></span></div>
-                <span class="text-sm font-semibold tracking-[0.22em] text-main">VAULT//SYNC</span>
+                <div class="brand-copy">
+                  <div class="brand-heading">
+                    <p class="brand-name text-main">VAULT//SYNC</p>
+                    <span class="brand-version">{{ appVersion }}</span>
+                  </div>
+                </div>
               </div>
               <p class="eyebrow">SECURE BACKUP CONTROL</p>
               <h1 class="mt-4 max-w-md text-4xl font-semibold leading-tight tracking-tight text-main">让每一次备份，都有迹可循。</h1>
@@ -30,7 +35,7 @@
         <section class="flex items-center p-8 sm:p-12">
           <form class="w-full max-w-sm" @submit.prevent="handleLogin">
             <div class="mb-10 lg:hidden">
-              <div class="mb-7 flex items-center gap-3"><div class="brand-mark"><span class="brand-mark-core"></span></div><span class="text-sm font-semibold tracking-[0.22em]">VAULT//SYNC</span></div>
+              <div class="brand-lockup mb-7"><div class="brand-mark"><span class="brand-mark-core"></span></div><div class="brand-copy"><div class="brand-heading"><p class="brand-name">VAULT//SYNC</p><span class="brand-version">{{ appVersion }}</span></div></div></div>
               <p class="eyebrow">SECURE BACKUP CONTROL</p>
             </div>
             <p class="eyebrow">WELCOME BACK</p>
@@ -65,7 +70,7 @@
 
   <div v-else class="min-h-screen bg-ink text-main lg:flex">
     <aside class="hidden w-64 shrink-0 border-r border-line bg-panel px-4 py-6 lg:flex lg:flex-col">
-      <div class="flex items-center gap-3 px-3"><div class="brand-mark"><span class="brand-mark-core"></span></div><div><p class="text-sm font-semibold tracking-[0.18em] text-main">VAULT//SYNC</p><p class="mt-1 text-[10px] uppercase tracking-[0.2em] text-subtle">backup control plane</p></div></div>
+      <div class="brand-lockup px-3"><div class="brand-mark"><span class="brand-mark-core"></span></div><div class="brand-copy"><div class="brand-heading"><p class="brand-name text-main">VAULT//SYNC</p><span class="brand-version">{{ appVersion }}</span></div><p class="brand-subtitle">backup control plane</p></div></div>
       <nav class="mt-12 space-y-1" aria-label="主导航">
         <template v-for="group in navGroups" :key="group.label || group.items[0].path">
           <div :class="['nav-group', group.label ? 'is-grouped' : '']">
@@ -86,10 +91,10 @@
     </aside>
 
     <main class="min-w-0 flex-1">
-      <header class="sticky top-0 z-20 border-b border-line/80 bg-ink/90 px-5 py-4 backdrop-blur-xl sm:px-8 lg:px-10">
+      <header class="sticky top-0 z-20 border-b border-line/80 bg-ink/90 px-5 py-3 backdrop-blur-xl sm:px-8 lg:px-10">
         <div class="mx-auto flex max-w-[1440px] items-center justify-between gap-4">
-          <div class="flex items-center gap-3"><div class="brand-mark lg:hidden"><span class="brand-mark-core"></span></div><div><p class="eyebrow">{{ currentSection.kicker }}</p><h1 class="mt-1 text-xl font-semibold tracking-tight text-main sm:text-2xl">{{ currentSection.label }}</h1></div></div>
-          <div class="flex items-center gap-2">
+          <div class="brand-lockup lg:hidden"><div class="brand-mark"><span class="brand-mark-core"></span></div><div class="brand-copy"><div class="brand-heading"><p class="brand-name text-main">VAULT//SYNC</p><span class="brand-version">{{ appVersion }}</span></div></div></div>
+          <div class="ml-auto flex items-center gap-2">
             <button class="icon-button theme-toggle" type="button" :aria-label="theme === 'dark' ? '切换到浅色主题' : '切换到深色主题'" :title="theme === 'dark' ? '切换到浅色主题' : '切换到深色主题'" :aria-pressed="theme === 'light'" @click="toggleTheme">
               <svg v-if="theme === 'dark'" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 3v1.5M12 19.5V21M4.64 4.64l1.06 1.06m12.6 12.6 1.06 1.06M3 12h1.5m16 0H21M4.64 19.36l1.06-1.06m12.6-12.6 1.06-1.06M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z" /></svg>
               <svg v-else class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M20.3 15.5A8.5 8.5 0 0 1 8.5 3.7 8.5 8.5 0 1 0 20.3 15.5Z" /></svg>
@@ -97,7 +102,7 @@
             <button class="btn-ghost" type="button" title="退出登录" @click="handleLogout"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M15 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-2M10 12h10m0 0-3-3m3 3-3 3" /></svg><span class="hidden sm:inline">退出</span></button>
           </div>
         </div>
-        <nav class="mx-auto mt-4 flex max-w-[1440px] gap-1 overflow-x-auto lg:hidden" aria-label="移动端导航"><router-link v-for="item in navItems" :key="item.path" :to="item.path" class="mobile-nav-link">{{ item.label }}</router-link></nav>
+        <nav class="mx-auto mt-3 flex max-w-[1440px] gap-1 overflow-x-auto lg:hidden" aria-label="移动端导航"><router-link v-for="item in navItems" :key="item.path" :to="item.path" class="mobile-nav-link">{{ item.label }}</router-link></nav>
       </header>
 
       <div class="mx-auto max-w-[1440px] p-5 sm:p-8 lg:p-10"><router-view v-slot="{ Component }"><transition name="fade" mode="out-in"><component :is="Component" /></transition></router-view></div>
@@ -109,11 +114,11 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import ToastContainer from '@/components/ui/ToastContainer.vue'
 import ConfirmModal from '@/components/ui/ConfirmModal.vue'
-import { authApi } from '@/api'
+import { authApi, metaApi } from '@/api'
 import { setToastInstance, useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 
@@ -123,6 +128,7 @@ const { state: confirmState, handleConfirm, handleCancel } = useConfirm()
 const toastRef = ref(null)
 const booting = ref(true)
 const authenticated = ref(false)
+const appVersion = ref('DEV')
 const password = ref('')
 const showPassword = ref(false)
 const loggingIn = ref(false)
@@ -143,7 +149,6 @@ const navGroups = [
 ]
 const navItems = navGroups.flatMap(group => group.items)
 const isNavItemActive = (item) => route.path === item.path || route.path.startsWith(`${item.path}/`)
-const currentSection = computed(() => navItems.find(isNavItemActive) || navItems[0])
 
 const applyTheme = (nextTheme) => {
   theme.value = nextTheme === 'light' ? 'light' : 'dark'
@@ -185,18 +190,32 @@ const handleAuthRequired = () => {
   }
 }
 
-onMounted(async () => {
-  setToastInstance(toastRef.value)
-  window.addEventListener('auth:required', handleAuthRequired)
-  applyTheme(theme.value)
+const loadAppMeta = async () => {
+  try {
+    const data = await metaApi.get()
+    if (typeof data?.version === 'string' && data.version.trim()) {
+      appVersion.value = data.version.trim()
+    }
+  } catch {
+    // Keep DEV for local static builds or older backends without /api/meta.
+  }
+}
+
+const restoreSession = async () => {
   try {
     await authApi.session()
     authenticated.value = true
   } catch {
     authenticated.value = false
-  } finally {
-    booting.value = false
   }
+}
+
+onMounted(async () => {
+  setToastInstance(toastRef.value)
+  window.addEventListener('auth:required', handleAuthRequired)
+  applyTheme(theme.value)
+  await Promise.all([loadAppMeta(), restoreSession()])
+  booting.value = false
 })
 
 onBeforeUnmount(() => window.removeEventListener('auth:required', handleAuthRequired))

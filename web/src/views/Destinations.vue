@@ -30,6 +30,9 @@
           <div class="resource-meta"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg><span>创建于 {{ formatDateTime(destination.created_at) }}</span></div>
         </div>
         <div class="resource-actions">
+          <button v-if="destination.type === 'webdav'" class="btn-secondary" type="button" :disabled="testingDestinationId === destination.id" @click="testDestination(destination)">
+            <span v-if="testingDestinationId === destination.id" class="spinner"></span>{{ testingDestinationId === destination.id ? '测试中…' : '测试连接' }}
+          </button>
           <button :class="destination.enabled ? 'btn-ghost' : 'btn-secondary'" type="button" @click="toggleDestination(destination.id, !destination.enabled)">{{ destination.enabled ? '禁用' : '启用' }}</button>
           <button class="btn-secondary" type="button" @click="editDestination(destination)">编辑</button>
           <button class="btn-danger" type="button" @click="deleteDestination(destination.id)">删除</button>
@@ -54,6 +57,7 @@ const toast = useToast()
 const { confirm } = useConfirm()
 const destinations = ref([])
 const loading = ref(false)
+const testingDestinationId = ref(null)
 const showModal = ref(false)
 const editingDestination = ref(null)
 const pagination = ref({ page: 1, page_size: 10, total: 0, total_page: 0 })
@@ -98,6 +102,18 @@ const editDestination = (destination) => { editingDestination.value = destinatio
 const toggleDestination = async (id, enabled) => {
   try { await destinationsApi.setEnabled(id, enabled); toast.success(enabled ? '已启用' : '已禁用'); loadDestinations() }
   catch (error) { console.error('Failed to toggle destination:', error); toast.error('操作失败') }
+}
+const testDestination = async (destination) => {
+  testingDestinationId.value = destination.id
+  try {
+    await destinationsApi.test(destination.id)
+    toast.success('WebDAV 连接正常')
+  } catch (error) {
+    console.error('Failed to test destination:', error)
+    toast.error(error.message || 'WebDAV 连接测试失败')
+  } finally {
+    testingDestinationId.value = null
+  }
 }
 const deleteDestination = async (id) => {
   const confirmed = await confirm({ title: '删除存储目标', message: '确定要删除这个存储目标吗？此操作不可恢复。', type: 'danger', confirmText: '删除' })
