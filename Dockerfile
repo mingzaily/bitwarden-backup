@@ -94,9 +94,11 @@ RUN chown -R node:node /app
 USER node
 
 # Environment variables
+ARG APP_VERSION=DEV
 ENV SERVER_PORT=8080
 ENV DB_PATH=/app/data/bitwarden-backup.db
 ENV APP_ENV=production
+ENV APP_VERSION=${APP_VERSION}
 
 # Expose port
 EXPOSE 8080

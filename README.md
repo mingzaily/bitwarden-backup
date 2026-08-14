@@ -13,7 +13,7 @@
 - 定时或手动执行备份，支持 6 位 Cron 表达式
 - 支持本地存储、WebDAV、S3 兼容存储和目标 Bitwarden 服务器
 - 管理多个 Bitwarden 源站、存储目标和备份任务
-- 查看运行记录、备份产物和错误详情
+- 查看运行记录、备份产物和错误详情，支持批量删除记录（不删除备份文件）
 - 支持备份文件加密、保留策略和临时文件清理
 - 提供 amd64/arm64 Docker 镜像
 
@@ -71,6 +71,7 @@ BITWARDEN_BACKUP_ADMIN_PASSWORD='至少 8 位的随机密码' go run ./cmd/serve
 | `BITWARDEN_BACKUP_MASTER_KEY` | 否 | 加密主密钥；未设置时自动生成并保存 | 自动生成 |
 | `SERVER_PORT` | 否 | HTTP 端口 | `8080` |
 | `DB_PATH` | 否 | SQLite 数据库路径 | `./data/bitwarden-backup.db` |
+| `APP_VERSION` | 否 | 页面显示的版本号；Release 镜像由 CI 自动注入 | `DEV` |
 | `AUTH_COOKIE_SECURE` | 否 | HTTPS 反向代理时启用 Secure Cookie | `false` |
 | `TZ` | 否 | 时区 | `Asia/Shanghai` |
 
@@ -81,7 +82,8 @@ BITWARDEN_BACKUP_ADMIN_PASSWORD='至少 8 位的随机密码' go run ./cmd/serve
 1. 在「备份资源 → Bitwarden 源站」添加源站，填写 Client ID、Client Secret 和 Master Password。
 2. 在「备份资源 → 存储目标」添加备份落点：本地、WebDAV、S3 或目标服务器。
 3. 在「备份任务」中选择源站、一个或多个目标，并设置手动执行或 Cron 计划。
-4. 在「运行记录」查看状态、HTTP 响应和备份文件。
+4. 可在任务中配置备份文件名模板；默认生成 `bitwarden_encrypted_export_YYYYMMDDHHmmss.json`，支持 `{time}`、`{task_name}` 和 `{medium}`（`local` / `webdav` / `oss`）。
+5. 存储目标的保留数量按当前任务的文件名模板执行；在「存储目标」可直接测试 WebDAV 连接，在「运行记录」查看状态、各服务商日志、HTTP 响应和备份文件。
 
 ## 安全
 
