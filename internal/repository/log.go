@@ -61,3 +61,13 @@ func (r *LogRepository) Create(log *model.BackupLog) error {
 func (r *LogRepository) Update(log *model.BackupLog) error {
 	return r.db.Save(log).Error
 }
+
+// DeleteByIDs removes completed execution records while keeping an active
+// execution visible to the scheduler until it finishes.
+func (r *LogRepository) DeleteByIDs(ids []uint) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	result := r.db.Where("id IN ? AND status <> ?", ids, "running").Delete(&model.BackupLog{})
+	return result.RowsAffected, result.Error
+}

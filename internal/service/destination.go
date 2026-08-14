@@ -1,7 +1,12 @@
 package service
 
 import (
+	"context"
+	"fmt"
+	"time"
+
 	"github.com/mingzaily/bitwarden-backup/internal/model"
+	"github.com/mingzaily/bitwarden-backup/internal/provider"
 	"github.com/mingzaily/bitwarden-backup/internal/repository"
 )
 
@@ -45,6 +50,28 @@ func (s *DestinationService) Toggle(id uint) error {
 	}
 	dest.Enabled = !dest.Enabled
 	return s.repo.Update(dest)
+}
+
+// TestConnection validates a destination without creating a backup artifact.
+// At present WebDAV is the only provider with a safe connection probe.
+func (s *DestinationService) TestConnection(id uint) error {
+	destination, err := s.repo.FindByID(id)
+	if err != nil {
+		return err
+	}
+
+	p, err := provider.GetRegistry().Get(destination.Type)
+	if err != nil {
+		return err
+	}
+	tester, ok := p.(provider.ConnectionTester)
+	if !ok {
+		return fmt.Errorf("destination type %s does not support connection testing", destination.Type)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	return tester.Test(ctx, *destination)
 }
 
 // GetPaginated 分页获取备份目标

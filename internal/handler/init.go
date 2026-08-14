@@ -36,6 +36,7 @@ type DestinationService interface {
 	UpdateEnabled(id uint, enabled bool) error
 	Delete(id uint) error
 	Toggle(id uint) error
+	TestConnection(id uint) error
 }
 
 // TaskService describes the task operations needed by handlers.
@@ -51,6 +52,7 @@ type TaskService interface {
 // LogService describes the log operations needed by handlers.
 type LogService interface {
 	GetPaginated(params model.PaginationParams, taskID *uint) ([]model.LogResponse, int64, error)
+	DeleteByIDs(ids []uint) (int64, error)
 }
 
 // OverviewService describes the aggregate data needed by the dashboard.

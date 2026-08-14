@@ -37,3 +37,15 @@ func TestConfigValidateAdminPasswordMinimumLength(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigLoadAppVersion(t *testing.T) {
+	t.Setenv("APP_VERSION", "")
+	if got := Load().AppVersion; got != "DEV" {
+		t.Fatalf("Load().AppVersion = %q, want DEV", got)
+	}
+
+	t.Setenv("APP_VERSION", "v0.2.1")
+	if got := Load().AppVersion; got != "v0.2.1" {
+		t.Fatalf("Load().AppVersion = %q, want v0.2.1", got)
+	}
+}

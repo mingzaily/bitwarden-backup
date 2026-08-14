@@ -5,6 +5,8 @@ import "time"
 // LogEntry 单条执行日志
 type LogEntry struct {
 	Time    string `json:"time"`
+	Source  string `json:"source,omitempty"`
+	Level   string `json:"level,omitempty"`
 	Message string `json:"message"`
 }
 
@@ -35,4 +37,9 @@ type LogResponse struct {
 	StartTime     time.Time  `json:"start_time"`
 	EndTime       *time.Time `json:"end_time"`
 	CreatedAt     time.Time  `json:"created_at"`
+}
+
+// DeleteLogsRequest contains the execution log IDs selected for deletion.
+type DeleteLogsRequest struct {
+	IDs []uint `json:"ids"`
 }

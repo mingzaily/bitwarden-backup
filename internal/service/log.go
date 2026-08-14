@@ -25,3 +25,7 @@ func (s *LogService) GetByTaskID(taskID uint) ([]model.BackupLog, error) {
 func (s *LogService) GetPaginated(params model.PaginationParams, taskID *uint) ([]model.LogResponse, int64, error) {
 	return s.repo.FindPaginated(params, taskID)
 }
+
+func (s *LogService) DeleteByIDs(ids []uint) (int64, error) {
+	return s.repo.DeleteByIDs(ids)
+}

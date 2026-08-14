@@ -173,6 +173,25 @@ func (a *API) ToggleDestination(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Destination toggled"})
 }
 
+// TestDestination checks a WebDAV destination without creating a test task or
+// uploading a backup file. The provider error is intentionally returned so a
+// user can see the HTTP status/response detail in the toast.
+func (a *API) TestDestination(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+	if err := a.destinationService.TestConnection(id); err != nil {
+		if isRecordNotFound(err) {
+			writeNotFound(c, "destination")
+			return
+		}
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "WebDAV connection succeeded"})
+}
+
 func (a *API) validateTargetServer(c *gin.Context, serverID *uint, resource string) bool {
 	if serverID == nil || *serverID == 0 {
 		writeBadRequest(c, resource+" is required")

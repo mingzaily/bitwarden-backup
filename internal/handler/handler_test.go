@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -108,6 +109,97 @@ type fakeOverviewService struct {
 
 func (f *fakeOverviewService) Get() (model.OverviewResponse, error) {
 	return f.response, f.err
+}
+
+type fakeLogService struct {
+	deletedIDs []uint
+	deleted    int64
+	err        error
+}
+
+func (f *fakeLogService) GetPaginated(model.PaginationParams, *uint) ([]model.LogResponse, int64, error) {
+	return nil, 0, nil
+}
+
+func (f *fakeLogService) DeleteByIDs(ids []uint) (int64, error) {
+	f.deletedIDs = append([]uint(nil), ids...)
+	return f.deleted, f.err
+}
+
+func TestDeleteLogsUsesInjectedService(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	service := &fakeLogService{deleted: 2}
+	api := NewWithDependencies(nil, nil, nil, service, nil)
+	r := gin.New()
+	r.DELETE("/logs", api.DeleteLogs)
+
+	req := httptest.NewRequest(http.MethodDelete, "/logs", strings.NewReader(`{"ids":[7,9]}`))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	r.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", res.Code, http.StatusOK, res.Body.String())
+	}
+	if len(service.deletedIDs) != 2 || service.deletedIDs[0] != 7 || service.deletedIDs[1] != 9 {
+		t.Fatalf("unexpected deleted IDs: %v", service.deletedIDs)
+	}
+	if !strings.Contains(res.Body.String(), `"deleted":2`) {
+		t.Fatalf("unexpected response: %s", res.Body.String())
+	}
+}
+
+func TestDeleteLogsRejectsInvalidSelections(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{name: "empty", body: `{"ids":[]}`},
+		{name: "zero ID", body: `{"ids":[0]}`},
+		{name: "duplicate ID", body: `{"ids":[1,1]}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			service := &fakeLogService{}
+			api := NewWithDependencies(nil, nil, nil, service, nil)
+			r := gin.New()
+			r.DELETE("/logs", api.DeleteLogs)
+
+			req := httptest.NewRequest(http.MethodDelete, "/logs", strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			res := httptest.NewRecorder()
+			r.ServeHTTP(res, req)
+
+			if res.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d; body = %s", res.Code, http.StatusBadRequest, res.Body.String())
+			}
+			if service.deletedIDs != nil {
+				t.Fatalf("service should not be called: %v", service.deletedIDs)
+			}
+		})
+	}
+
+	ids := make([]uint, maxLogDeleteBatchSize+1)
+	for index := range ids {
+		ids[index] = uint(index + 1)
+	}
+	body, err := json.Marshal(model.DeleteLogsRequest{IDs: ids})
+	if err != nil {
+		t.Fatalf("marshal oversized request: %v", err)
+	}
+	service := &fakeLogService{}
+	api := NewWithDependencies(nil, nil, nil, service, nil)
+	r := gin.New()
+	r.DELETE("/logs", api.DeleteLogs)
+	req := httptest.NewRequest(http.MethodDelete, "/logs", strings.NewReader(string(body)))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	r.ServeHTTP(res, req)
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("oversized status = %d, want %d; body = %s", res.Code, http.StatusBadRequest, res.Body.String())
+	}
 }
 
 func TestGetOverviewUsesInjectedService(t *testing.T) {

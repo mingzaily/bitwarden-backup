@@ -16,16 +16,16 @@ func setupRouter(cfg *config.Config, authManager *auth.Manager, api *handler.API
 	if cfg.AppEnv == "dev" {
 		gin.SetMode(gin.DebugMode)
 		r := gin.Default() // 包含访问日志
-		return setupRoutes(r, authManager, api)
+		return setupRoutes(r, cfg, authManager, api)
 	} else {
 		gin.SetMode(gin.ReleaseMode)
 		r := gin.New()
 		r.Use(gin.Recovery()) // 仅保留 panic 恢复
-		return setupRoutes(r, authManager, api)
+		return setupRoutes(r, cfg, authManager, api)
 	}
 }
 
-func setupRoutes(r *gin.Engine, authManager *auth.Manager, apiHandler *handler.API) *gin.Engine {
+func setupRoutes(r *gin.Engine, cfg *config.Config, authManager *auth.Manager, apiHandler *handler.API) *gin.Engine {
 	r.Use(securityHeaders())
 	r.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
@@ -33,13 +33,17 @@ func setupRoutes(r *gin.Engine, authManager *auth.Manager, apiHandler *handler.A
 
 	// 静态资源（Vue 构建产物）
 	r.Static("/assets", "./web/dist/assets")
+	r.StaticFile("/favicon.svg", "./web/dist/favicon.svg")
 
 	// API 路由
 	api := r.Group("/api")
 	api.Use(requestBodyLimit(1 << 20))
 	{
-		// 登录接口保持公开，其余 API 都需要管理员会话。
+		// 登录和版本信息保持公开，其余 API 都需要管理员会话。
 		api.POST("/auth/login", authManager.Login)
+		api.GET("/meta", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"version": cfg.AppVersion})
+		})
 		protected := api.Group("")
 		protected.Use(authManager.Require(), authManager.CSRF())
 		protected.GET("/auth/session", authManager.Session)
@@ -59,6 +63,7 @@ func setupRoutes(r *gin.Engine, authManager *auth.Manager, apiHandler *handler.A
 		protected.GET("/destinations/:id", apiHandler.GetDestination)
 		protected.POST("/destinations", apiHandler.CreateDestination)
 		protected.PUT("/destinations/:id", apiHandler.UpdateDestination)
+		protected.POST("/destinations/:id/test", apiHandler.TestDestination)
 		protected.PATCH("/destinations/:id/enabled", apiHandler.SetDestinationEnabled)
 		protected.DELETE("/destinations/:id", apiHandler.DeleteDestination)
 		protected.PATCH("/destinations/:id/toggle", apiHandler.ToggleDestination)
@@ -74,6 +79,7 @@ func setupRoutes(r *gin.Engine, authManager *auth.Manager, apiHandler *handler.A
 
 		// 日志
 		protected.GET("/logs", apiHandler.GetLogs)
+		protected.DELETE("/logs", apiHandler.DeleteLogs)
 	}
 
 	// SPA History Mode Fallback

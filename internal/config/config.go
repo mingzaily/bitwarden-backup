@@ -12,6 +12,7 @@ type Config struct {
 	DBPath           string
 	LogLevel         string
 	AppEnv           string
+	AppVersion       string
 	AdminPassword    string
 	AuthCookieSecure bool
 }
@@ -22,6 +23,7 @@ func Load() *Config {
 		DBPath:           getEnv("DB_PATH", "./data/bitwarden-backup.db"),
 		LogLevel:         getEnv("LOG_LEVEL", "info"),
 		AppEnv:           getEnv("APP_ENV", "production"),
+		AppVersion:       getEnv("APP_VERSION", "DEV"),
 		AdminPassword:    getEnv("BITWARDEN_BACKUP_ADMIN_PASSWORD", ""),
 		AuthCookieSecure: getEnvAsBool("AUTH_COOKIE_SECURE", false),
 	}
