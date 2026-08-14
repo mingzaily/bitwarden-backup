@@ -20,8 +20,8 @@
                 <div class="brand-copy">
                   <div class="brand-heading">
                     <p class="brand-name text-main">VAULT//SYNC</p>
-                    <span class="brand-version">{{ appVersion }}</span>
                   </div>
+                  <span class="brand-version">{{ appVersion }}</span>
                 </div>
               </div>
               <p class="eyebrow">SECURE BACKUP CONTROL</p>
@@ -35,7 +35,7 @@
         <section class="flex items-center p-8 sm:p-12">
           <form class="w-full max-w-sm" @submit.prevent="handleLogin">
             <div class="mb-10 lg:hidden">
-              <div class="brand-lockup mb-7"><div class="brand-mark"><span class="brand-mark-core"></span></div><div class="brand-copy"><div class="brand-heading"><p class="brand-name">VAULT//SYNC</p><span class="brand-version">{{ appVersion }}</span></div></div></div>
+              <div class="brand-lockup mb-7"><div class="brand-mark"><span class="brand-mark-core"></span></div><div class="brand-copy"><div class="brand-heading"><p class="brand-name">VAULT//SYNC</p></div><span class="brand-version">{{ appVersion }}</span></div></div>
               <p class="eyebrow">SECURE BACKUP CONTROL</p>
             </div>
             <p class="eyebrow">WELCOME BACK</p>
@@ -70,7 +70,7 @@
 
   <div v-else class="min-h-screen bg-ink text-main lg:flex">
     <aside class="hidden w-64 shrink-0 border-r border-line bg-panel px-4 py-6 lg:flex lg:flex-col">
-      <div class="brand-lockup px-3"><div class="brand-mark"><span class="brand-mark-core"></span></div><div class="brand-copy"><div class="brand-heading"><p class="brand-name text-main">VAULT//SYNC</p><span class="brand-version">{{ appVersion }}</span></div><p class="brand-subtitle">backup control plane</p></div></div>
+      <div class="brand-lockup px-3"><div class="brand-mark"><span class="brand-mark-core"></span></div><div class="brand-copy"><div class="brand-heading"><p class="brand-name text-main">VAULT//SYNC</p></div><p class="brand-subtitle">backup control plane</p></div></div>
       <nav class="mt-12 space-y-1" aria-label="主导航">
         <template v-for="group in navGroups" :key="group.label || group.items[0].path">
           <div :class="['nav-group', group.label ? 'is-grouped' : '']">
@@ -87,13 +87,16 @@
           </div>
         </template>
       </nav>
-      <div class="mt-auto rounded-2xl border border-line bg-panel-soft/70 p-4"><p class="eyebrow">SYSTEM STATUS</p><div class="mt-3 flex items-center gap-2 text-sm text-muted"><span class="status-pulse"></span>运行正常</div><p class="mt-2 text-xs leading-5 text-subtle">凭证已加密 · API 会话安全</p></div>
+      <div class="mt-auto space-y-2">
+        <div class="rounded-2xl border border-line bg-panel-soft/70 p-4"><p class="eyebrow">SYSTEM STATUS</p><div class="mt-3 flex items-center gap-2 text-sm text-muted"><span class="status-pulse"></span>运行正常</div><p class="mt-2 text-xs leading-5 text-subtle">凭证已加密 · API 会话安全</p></div>
+        <div class="rounded-2xl border border-line bg-panel-soft/70 p-4"><p class="eyebrow">VERSION</p><div class="mt-3"><span class="brand-version mt-0">{{ appVersion }}</span></div><p class="mt-2 text-xs leading-5 text-subtle">当前运行版本</p></div>
+      </div>
     </aside>
 
     <main class="min-w-0 flex-1">
       <header class="sticky top-0 z-20 border-b border-line/80 bg-ink/90 px-5 py-3 backdrop-blur-xl sm:px-8 lg:px-10">
         <div class="mx-auto flex max-w-[1440px] items-center justify-between gap-4">
-          <div class="brand-lockup lg:hidden"><div class="brand-mark"><span class="brand-mark-core"></span></div><div class="brand-copy"><div class="brand-heading"><p class="brand-name text-main">VAULT//SYNC</p><span class="brand-version">{{ appVersion }}</span></div></div></div>
+          <div class="brand-lockup lg:hidden"><div class="brand-mark"><span class="brand-mark-core"></span></div><div class="brand-copy"><div class="brand-heading"><p class="brand-name text-main">VAULT//SYNC</p></div><span class="brand-version">{{ appVersion }}</span></div></div>
           <div class="ml-auto flex items-center gap-2">
             <button class="icon-button theme-toggle" type="button" :aria-label="theme === 'dark' ? '切换到浅色主题' : '切换到深色主题'" :title="theme === 'dark' ? '切换到浅色主题' : '切换到深色主题'" :aria-pressed="theme === 'light'" @click="toggleTheme">
               <svg v-if="theme === 'dark'" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 3v1.5M12 19.5V21M4.64 4.64l1.06 1.06m12.6 12.6 1.06 1.06M3 12h1.5m16 0H21M4.64 19.36l1.06-1.06m12.6-12.6 1.06-1.06M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z" /></svg>
