@@ -1,13 +1,13 @@
 package provider
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"path"
 	"sort"
-	"strings"
 
 	"github.com/mingzaily/bitwarden-backup/internal/model"
-	"github.com/mingzaily/bitwarden-backup/internal/safety"
 	"github.com/mingzaily/bitwarden-backup/internal/webdav"
 )
 
@@ -29,24 +29,38 @@ func (p *WebDAVProvider) Backup(ctx BackupContext) (string, error) {
 	dest := ctx.Destination
 
 	client := webdav.NewClient(dest.WebDAVURL, dest.WebDAVUsername, dest.WebDAVPassword)
-	remoteFile := path.Join(dest.WebDAVPath, fmt.Sprintf("backup_%s_%s.json", safety.Filename(ctx.TaskName), safety.Filename(ctx.Timestamp)))
+	remoteFile := path.Join(dest.WebDAVPath, renderBackupFilename(ctx))
+	ctx.AddLog("webdav", fmt.Sprintf("开始 WebDAV 上传: %s", remoteFile))
 
-	if err := client.UploadFile(ctx.SourceFile, remoteFile); err != nil {
+	if err := client.UploadFileContext(ctx.Context, ctx.SourceFile, remoteFile); err != nil {
+		ctx.AddLog("webdav", "WebDAV 上传失败: "+err.Error())
 		return "", fmt.Errorf("failed to upload to webdav: %w", err)
 	}
 
+	ctx.AddLog("webdav", fmt.Sprintf("WebDAV 上传完成: %s", remoteFile))
 	// 返回完整的 WebDAV 路径
 	return dest.WebDAVURL + remoteFile, nil
 }
 
+// Test verifies that the configured collection can be queried without
+// uploading a backup file or creating a test task.
+func (p *WebDAVProvider) Test(ctx context.Context, dest model.BackupDestination) error {
+	client := webdav.NewClient(dest.WebDAVURL, dest.WebDAVUsername, dest.WebDAVPassword)
+	if err := client.Test(ctx, dest.WebDAVPath); err != nil {
+		return fmt.Errorf("WebDAV connection test failed: %w", err)
+	}
+	return nil
+}
+
 // Cleanup 清理超出保留数量的旧备份
-func (p *WebDAVProvider) Cleanup(dest model.BackupDestination, maxCount int) (int, error) {
+func (p *WebDAVProvider) Cleanup(ctx BackupContext, maxCount int) (int, error) {
 	if maxCount <= 0 {
 		return 0, nil
 	}
 
+	dest := ctx.Destination
 	client := webdav.NewClient(dest.WebDAVURL, dest.WebDAVUsername, dest.WebDAVPassword)
-	files, err := client.ListFiles(dest.WebDAVPath)
+	files, err := client.ListFilesContext(ctx.Context, dest.WebDAVPath)
 	if err != nil {
 		return 0, fmt.Errorf("failed to list files: %w", err)
 	}
@@ -57,7 +71,7 @@ func (p *WebDAVProvider) Cleanup(dest model.BackupDestination, maxCount int) (in
 		if f.IsDir {
 			continue
 		}
-		if !strings.HasPrefix(f.Name, "backup_") || !strings.HasSuffix(f.Name, ".json") {
+		if !matchesBackupFilename(f.Name, ctx) {
 			continue
 		}
 		backups = append(backups, f)
@@ -74,12 +88,17 @@ func (p *WebDAVProvider) Cleanup(dest model.BackupDestination, maxCount int) (in
 
 	// 删除超出数量的旧文件
 	deleted := 0
+	var deleteErrors []error
 	for i := maxCount; i < len(backups); i++ {
 		remotePath := path.Join(dest.WebDAVPath, backups[i].Name)
-		if err := client.Delete(remotePath); err != nil {
+		if err := client.DeleteContext(ctx.Context, remotePath); err != nil {
+			deleteErrors = append(deleteErrors, fmt.Errorf("%s: %w", backups[i].Name, err))
 			continue
 		}
 		deleted++
+	}
+	if len(deleteErrors) > 0 {
+		return deleted, fmt.Errorf("failed to remove old WebDAV backups: %w", errors.Join(deleteErrors...))
 	}
 
 	return deleted, nil

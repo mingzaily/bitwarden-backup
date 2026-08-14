@@ -78,10 +78,11 @@ func (r *TaskRepository) UpdateWithDestinations(task *model.BackupTask, destinat
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		// 只更新指定字段，保留 created_at
 		result := tx.Model(&model.BackupTask{}).Where("id = ?", task.ID).Updates(map[string]any{
-			"name":             task.Name,
-			"source_server_id": task.SourceServerID,
-			"cron_expression":  task.CronExpression,
-			"enabled":          task.Enabled,
+			"name":              task.Name,
+			"source_server_id":  task.SourceServerID,
+			"cron_expression":   task.CronExpression,
+			"filename_template": model.NormalizeFilenameTemplate(task.FilenameTemplate),
+			"enabled":           task.Enabled,
 		})
 		if result.Error != nil {
 			return result.Error

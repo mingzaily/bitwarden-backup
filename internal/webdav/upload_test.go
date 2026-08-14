@@ -1,6 +1,7 @@
 package webdav
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -143,6 +144,54 @@ func TestUploadFileIncludesWebDAVResponseBody(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "status 409") || !strings.Contains(err.Error(), "parent collection missing") {
 		t.Fatalf("UploadFile error = %q, want status and response body", err)
+	}
+}
+
+func TestTestChecksCollectionWithoutUploading(t *testing.T) {
+	var method string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		method = r.Method
+		if r.Method != "PROPFIND" {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/xml")
+		w.WriteHeader(http.StatusMultiStatus)
+		_, _ = io.WriteString(w, `<?xml version="1.0"?><D:multistatus xmlns:D="DAV:"/>`)
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL+"/dav/", "user", "password")
+	if err := client.Test(context.Background(), "/backup"); err != nil {
+		t.Fatalf("Test returned error: %v", err)
+	}
+	if method != "PROPFIND" {
+		t.Fatalf("Test used %q, want PROPFIND", method)
+	}
+}
+
+func TestTestRejectsMissingCollection(t *testing.T) {
+	var method string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		method = r.Method
+		if r.Method == "PROPFIND" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL+"/dav/", "user", "password")
+	err := client.Test(context.Background(), "/new-backup")
+	if err == nil {
+		t.Fatal("Test returned nil for a missing collection")
+	}
+	if !strings.Contains(err.Error(), "status 404") {
+		t.Fatalf("Test error = %q, want status 404", err)
+	}
+	if method != "PROPFIND" {
+		t.Fatalf("Test used %q, want PROPFIND", method)
 	}
 }
 

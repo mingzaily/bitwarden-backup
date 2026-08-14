@@ -14,17 +14,24 @@ import (
 	"time"
 
 	"github.com/mingzaily/bitwarden-backup/internal/logger"
+	"github.com/mingzaily/bitwarden-backup/internal/model"
 	"github.com/mingzaily/bitwarden-backup/internal/safety"
 )
 
 // bwMu 全局互斥锁，防止并发调用 Bitwarden CLI
 var bwMu sync.Mutex
 
-// LogEntry 单条执行日志
-type LogEntry struct {
-	Time    string `json:"time"`
-	Message string `json:"message"`
-}
+type processLockContextKey struct{}
+
+var processLockKey processLockContextKey
+
+// LogEntry keeps the Bitwarden package API compatible while sharing the
+// execution-log shape with the persistence model.
+type LogEntry = model.LogEntry
+
+// LogSink receives sanitized execution messages from a nested client, such
+// as the Bitwarden CLI client used by the server destination provider.
+type LogSink func(source, message string)
 
 // Client Bitwarden CLI 客户端
 type Client struct {
@@ -33,14 +40,46 @@ type Client struct {
 	vaultUnlocked bool
 	logger        *slog.Logger
 	logs          []LogEntry
+	logSource     string
+	logSink       LogSink
 }
 
 // NewClient 创建新的 Bitwarden 客户端
 func NewClient() *Client {
-	return &Client{
-		logger: logger.Module(logger.ModuleBitwarden),
-		logs:   make([]LogEntry, 0),
+	return NewClientWithLogSink("bitwarden", nil)
+}
+
+// NewClientWithLogSink creates a client with a source label and optional
+// parent sink. The sink is used to merge nested provider logs into the main
+// task execution log.
+func NewClientWithLogSink(source string, sink LogSink) *Client {
+	if strings.TrimSpace(source) == "" {
+		source = "bitwarden"
 	}
+	return &Client{
+		logger:    logger.Module(logger.ModuleBitwarden),
+		logs:      make([]LogEntry, 0),
+		logSource: source,
+		logSink:   sink,
+	}
+}
+
+// WithProcessLock serializes a complete sequence of Bitwarden CLI commands.
+// The CLI stores the configured server globally, so locking individual
+// commands is not enough when two workflows switch between source servers.
+func (c *Client) WithProcessLock(ctx context.Context, fn func(context.Context) error) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	bwMu.Lock()
+	defer bwMu.Unlock()
+
+	return fn(context.WithValue(ctx, processLockKey, true))
+}
+
+func hasProcessLock(ctx context.Context) bool {
+	return ctx != nil && ctx.Value(processLockKey) == true
 }
 
 // ansiRegex 匹配 ANSI 转义序列
@@ -77,16 +116,44 @@ func sanitizeBWOutput(s string) string {
 
 // AddLog 添加一条日志
 func (c *Client) AddLog(message string) {
+	c.AddLogWithSource(c.logSource, message)
+}
+
+// AddLogWithSource appends a sanitized log entry with an explicit provider
+// source, allowing one task log to distinguish Bitwarden, WebDAV, OSS, local
+// copy and server operations.
+func (c *Client) AddLogWithSource(source, message string) {
+	c.addLogWithSourceLevel(source, message, "")
+}
+
+func (c *Client) addLogWithSourceLevel(source, message, level string) {
 	// 统一脱敏处理
 	cleanMessage := sanitizeBWOutput(message)
 	if cleanMessage == "" {
 		return // 如果脱敏后为空，不记录日志
 	}
-	c.logs = append(c.logs, LogEntry{
+	if strings.TrimSpace(source) == "" {
+		source = c.logSource
+	}
+	if level == "" {
+		level = "info"
+		lowerMessage := strings.ToLower(cleanMessage)
+		expectedLogout := strings.HasPrefix(lowerMessage, "bw logout (exit=1") || strings.Contains(lowerMessage, "already logged out")
+		if !expectedLogout && (strings.Contains(lowerMessage, "failed") || strings.Contains(lowerMessage, "失败") || strings.Contains(lowerMessage, "stderr") || strings.Contains(lowerMessage, "exit=1")) {
+			level = "error"
+		}
+	}
+	entry := LogEntry{
 		Time:    time.Now().Format("2006/01/02 15:04:05"),
+		Source:  source,
+		Level:   level,
 		Message: cleanMessage,
-	})
-	c.logger.Info(cleanMessage)
+	}
+	c.logs = append(c.logs, entry)
+	c.logger.Info(cleanMessage, "source", source)
+	if c.logSink != nil {
+		c.logSink(source, cleanMessage)
+	}
 }
 
 // GetLogs 获取所有日志
@@ -129,8 +196,10 @@ func redactBWArgs(args []string) []string {
 }
 
 func (c *Client) runBW(ctx context.Context, args []string, stdin string, extraEnv map[string]string) (bwExecResult, error) {
-	bwMu.Lock()
-	defer bwMu.Unlock()
+	if !hasProcessLock(ctx) {
+		bwMu.Lock()
+		defer bwMu.Unlock()
+	}
 
 	start := time.Now()
 	cmd := exec.CommandContext(ctx, "bw", args...)
@@ -175,7 +244,16 @@ func (c *Client) runBW(ctx context.Context, args []string, stdin string, extraEn
 	// 统一日志：控制台和数据库都记录同一条
 	logMsg := fmt.Sprintf("bw %s (exit=%d, %dms)", strings.Join(redactBWArgs(args), " "), exitCode, duration.Milliseconds())
 	c.logger.Info(logMsg)
-	c.AddLog(logMsg)
+	logLevel := ""
+	if len(args) > 0 && strings.EqualFold(args[0], "logout") {
+		stderr := strings.ToLower(res.Stderr)
+		if strings.Contains(stderr, "not logged in") || strings.Contains(stderr, "already logged out") {
+			// Bitwarden CLI uses exit code 1 when logout is requested while no
+			// session exists. That is an expected idempotent outcome.
+			logLevel = "info"
+		}
+	}
+	c.addLogWithSourceLevel(c.logSource, logMsg, logLevel)
 	return res, err
 }
 
@@ -189,7 +267,8 @@ func isSensitiveEnvKey(key string) bool {
 }
 
 type bwStatusResponse struct {
-	Status string `json:"status"`
+	ServerURL string `json:"serverUrl"`
+	Status    string `json:"status"`
 }
 
 // Status 获取当前 vault 状态（unauthenticated / locked / unlocked）
@@ -198,9 +277,6 @@ func (c *Client) Status(ctx context.Context) (string, error) {
 	stdout := strings.TrimSpace(res.Stdout)
 	stderr := strings.TrimSpace(res.Stderr)
 
-	if stdout != "" {
-		c.AddLog(fmt.Sprintf("bw status stdout: %s", stdout))
-	}
 	if stderr != "" {
 		c.AddLog(fmt.Sprintf("bw status stderr: %s", stderr))
 	}
@@ -210,11 +286,19 @@ func (c *Client) Status(ctx context.Context) (string, error) {
 
 	var parsed bwStatusResponse
 	if uerr := json.Unmarshal([]byte(stdout), &parsed); uerr != nil {
+		if stdout != "" {
+			c.AddLog("bw status stdout: unable to parse status output")
+		}
 		return "", fmt.Errorf("failed to parse bw status output: %w", uerr)
 	}
 	if parsed.Status == "" {
 		return "", fmt.Errorf("bw status returned empty status")
 	}
+	statusMessage := "bw status: " + parsed.Status
+	if parsed.ServerURL != "" {
+		statusMessage += " (" + parsed.ServerURL + ")"
+	}
+	c.AddLog(statusMessage)
 	return parsed.Status, nil
 }
 

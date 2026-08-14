@@ -39,7 +39,7 @@ func (c *Client) Unlock(ctx context.Context, masterPassword string) error {
 			c.AddLog(fmt.Sprintf("bw unlock stdout: %s", stdout))
 		}
 		// 检测登录状态损坏的情况
-		if strings.Contains(stderr, "not logged in") || strings.Contains(stderr, "You are not logged in") {
+		if strings.Contains(strings.ToLower(stderr), "not logged in") {
 			return &ErrNotLoggedIn{Msg: fmt.Sprintf("unlock failed: %s", sanitizeBWOutput(stderr))}
 		}
 		return fmt.Errorf("unlock failed (exit=%d): %w", res.ExitCode, err)

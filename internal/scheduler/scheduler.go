@@ -14,14 +14,16 @@ type Scheduler struct {
 	taskEntries map[uint]cron.EntryID // 任务ID -> cron entry ID 映射
 	mu          sync.RWMutex          // 保护 taskEntries 的并发访问
 
-	taskQueue   chan uint
-	queuedTasks map[uint]bool
-	queueMu     sync.Mutex
-	stopChan    chan struct{}
-	workerDone  chan struct{}
-	startOnce   sync.Once
-	stopOnce    sync.Once
-	stopped     atomic.Bool
+	taskQueue     chan uint
+	queuedTasks   map[uint]bool
+	queueMu       sync.Mutex
+	stopChan      chan struct{}
+	workerDone    chan struct{}
+	startOnce     sync.Once
+	stopOnce      sync.Once
+	stopped       atomic.Bool
+	timestampMu   sync.Mutex
+	lastTimestamp time.Time
 }
 
 func New() *Scheduler {

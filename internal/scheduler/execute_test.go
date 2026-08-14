@@ -15,3 +15,16 @@ func TestTriggerTaskDeduplicatesQueuedTask(t *testing.T) {
 		t.Fatalf("queued task ID = %d, want 42", got)
 	}
 }
+
+func TestNextBackupTimestampIsMonotonic(t *testing.T) {
+	s := New()
+
+	first := s.nextBackupTimestamp()
+	second := s.nextBackupTimestamp()
+	if second <= first {
+		t.Fatalf("timestamps are not monotonic: first=%s second=%s", first, second)
+	}
+	if len(first) != 14 || len(second) != 14 {
+		t.Fatalf("timestamps must use YYYYMMDDHHmmss format: first=%s second=%s", first, second)
+	}
+}

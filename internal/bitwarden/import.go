@@ -36,8 +36,9 @@ func (c *Client) Logout(ctx context.Context) error {
 	res, err := c.runBW(ctx, []string{"logout"}, "", nil)
 	if err != nil {
 		stderr := strings.TrimSpace(res.Stderr)
+		lowerStderr := strings.ToLower(stderr)
 		// "You are not logged in" 意味着已经是登出状态，不算错误
-		if strings.Contains(stderr, "You are not logged in") {
+		if strings.Contains(lowerStderr, "not logged in") || strings.Contains(lowerStderr, "already logged out") {
 			c.AddLog("bw logout: already logged out")
 			c.sessionToken = ""
 			c.vaultUnlocked = false

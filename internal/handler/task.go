@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mingzaily/bitwarden-backup/internal/model"
@@ -88,6 +89,10 @@ func (a *API) CreateTask(c *gin.Context) {
 		writeBadRequest(c, err.Error())
 		return
 	}
+	if err := model.ValidateFilenameTemplate(req.FilenameTemplate); err != nil {
+		writeBadRequest(c, err.Error())
+		return
+	}
 	if req.SourceServerID == 0 {
 		writeBadRequest(c, "请选择源服务器")
 		return
@@ -110,10 +115,11 @@ func (a *API) CreateTask(c *gin.Context) {
 	}
 
 	task := &model.BackupTask{
-		Name:           req.Name,
-		SourceServerID: req.SourceServerID,
-		CronExpression: req.CronExpression,
-		Enabled:        true,
+		Name:             req.Name,
+		SourceServerID:   req.SourceServerID,
+		CronExpression:   req.CronExpression,
+		FilenameTemplate: model.NormalizeFilenameTemplate(req.FilenameTemplate),
+		Enabled:          true,
 	}
 
 	if err := a.taskService.CreateWithDestinations(task, req.DestinationIDs); err != nil {
@@ -159,6 +165,10 @@ func (a *API) UpdateTask(c *gin.Context) {
 		writeBadRequest(c, err.Error())
 		return
 	}
+	if err := model.ValidateFilenameTemplate(req.FilenameTemplate); err != nil {
+		writeBadRequest(c, err.Error())
+		return
+	}
 	if req.SourceServerID == 0 || len(req.DestinationIDs) == 0 {
 		writeBadRequest(c, "源服务器和备份目标不能为空")
 		return
@@ -173,9 +183,10 @@ func (a *API) UpdateTask(c *gin.Context) {
 	}
 
 	task := &model.BackupTask{
-		Name:           req.Name,
-		SourceServerID: req.SourceServerID,
-		CronExpression: req.CronExpression,
+		Name:             req.Name,
+		SourceServerID:   req.SourceServerID,
+		CronExpression:   req.CronExpression,
+		FilenameTemplate: model.NormalizeFilenameTemplate(req.FilenameTemplate),
 	}
 
 	existing, err := a.taskService.GetByID(id)
@@ -187,6 +198,11 @@ func (a *API) UpdateTask(c *gin.Context) {
 		task.Enabled = *req.Enabled
 	} else {
 		task.Enabled = existing.Enabled
+	}
+	// Keep a custom template when an older API client omits the newly added
+	// field during an update. New tasks still receive the default above.
+	if strings.TrimSpace(req.FilenameTemplate) == "" {
+		task.FilenameTemplate = model.NormalizeFilenameTemplate(existing.FilenameTemplate)
 	}
 
 	if err := a.taskService.UpdateWithDestinations(id, task, req.DestinationIDs); err != nil {

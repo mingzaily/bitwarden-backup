@@ -1,6 +1,7 @@
 package webdav
 
 import (
+	"context"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -24,6 +25,23 @@ const (
 	maxErrorResponse    = 64 << 10
 )
 
+// ResponseError preserves the HTTP status returned by a WebDAV server so
+// callers can distinguish an unreachable collection from a collection that
+// simply has not been created yet.
+type ResponseError struct {
+	Action     string
+	StatusCode int
+	Detail     string
+}
+
+func (e *ResponseError) Error() string {
+	message := fmt.Sprintf("%s failed with status %d", e.Action, e.StatusCode)
+	if e.Detail != "" {
+		message += ": " + e.Detail
+	}
+	return message
+}
+
 // responseError converts a non-success WebDAV response into a bounded error.
 // Providers include this error in task execution logs, so keep the response
 // body useful for diagnosis without allowing a remote server to flood logs.
@@ -34,18 +52,18 @@ func responseError(action string, resp *http.Response) error {
 		detail = detail[:maxErrorResponse] + "…"
 	}
 	if readErr != nil {
-		return fmt.Errorf("%s failed with status %d (read response: %w)", action, resp.StatusCode, readErr)
+		detail = fmt.Sprintf("read response: %v", readErr)
 	}
-	if detail == "" {
-		return fmt.Errorf("%s failed with status %d", action, resp.StatusCode)
-	}
-	return fmt.Errorf("%s failed with status %d: %s", action, resp.StatusCode, detail)
+	return &ResponseError{Action: action, StatusCode: resp.StatusCode, Detail: detail}
 }
 
 // ensureDirectory creates each missing collection in a remote path. WebDAV
 // servers are not required to create intermediate collections as a side
 // effect of PUT, and many providers return 409 when the parent is missing.
-func (c *Client) ensureDirectory(remotePath string) error {
+func (c *Client) ensureDirectory(ctx context.Context, remotePath string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	cleanPath := strings.Trim(remotePath, "/")
 	if cleanPath == "" {
 		return nil
@@ -54,14 +72,17 @@ func (c *Client) ensureDirectory(remotePath string) error {
 	current := ""
 	for _, segment := range strings.Split(cleanPath, "/") {
 		current = path.Join(current, segment)
-		if err := c.ensureCollection(current); err != nil {
+		if err := c.ensureCollection(ctx, current); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (c *Client) ensureCollection(remotePath string) error {
+func (c *Client) ensureCollection(ctx context.Context, remotePath string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	collectionPath := strings.TrimSuffix(remotePath, "/") + "/"
 	fullURL, err := c.requestURL(collectionPath)
 	if err != nil {
@@ -72,6 +93,7 @@ func (c *Client) ensureCollection(remotePath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create directory check request: %w", err)
 	}
+	probe = probe.WithContext(ctx)
 	probe.SetBasicAuth(c.username, c.password)
 	probe.Header.Set("Depth", "0")
 
@@ -93,6 +115,7 @@ func (c *Client) ensureCollection(remotePath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create directory request: %w", err)
 	}
+	create = create.WithContext(ctx)
 	create.SetBasicAuth(c.username, c.password)
 
 	resp, err = httpClient.Do(create)
@@ -135,6 +158,15 @@ func (c *Client) requestURL(remotePath string) (string, error) {
 
 // UploadFile 上传文件到 WebDAV
 func (c *Client) UploadFile(localPath, remotePath string) error {
+	return c.UploadFileContext(context.Background(), localPath, remotePath)
+}
+
+// UploadFileContext 上传文件到 WebDAV，并将调用方的取消信号传递给目录
+// 检查、目录创建和 PUT 请求。
+func (c *Client) UploadFileContext(ctx context.Context, localPath, remotePath string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	// Validate the complete remote path before creating any parent collection.
 	// This prevents an unsafe path from causing side effects during preparation.
 	fullURL, err := c.requestURL(remotePath)
@@ -155,7 +187,7 @@ func (c *Client) UploadFile(localPath, remotePath string) error {
 
 	parentPath := path.Dir(remotePath)
 	if parentPath != "." && parentPath != "/" {
-		if err := c.ensureDirectory(parentPath); err != nil {
+		if err := c.ensureDirectory(ctx, parentPath); err != nil {
 			return fmt.Errorf("failed to prepare WebDAV directory %q: %w", parentPath, err)
 		}
 	}
@@ -165,6 +197,7 @@ func (c *Client) UploadFile(localPath, remotePath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
+	req = req.WithContext(ctx)
 
 	// 设置认证
 	req.SetBasicAuth(c.username, c.password)
@@ -217,6 +250,14 @@ type prop struct {
 
 // ListFiles 列举目录下的文件
 func (c *Client) ListFiles(remotePath string) ([]FileInfo, error) {
+	return c.ListFilesContext(context.Background(), remotePath)
+}
+
+// ListFilesContext 列举目录下的文件，并允许调用方取消连接测试。
+func (c *Client) ListFilesContext(ctx context.Context, remotePath string) ([]FileInfo, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	fullURL, err := c.requestURL(remotePath)
 	if err != nil {
 		return nil, err
@@ -226,6 +267,7 @@ func (c *Client) ListFiles(remotePath string) ([]FileInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
+	req = req.WithContext(ctx)
 
 	req.SetBasicAuth(c.username, c.password)
 	req.Header.Set("Depth", "1")
@@ -274,8 +316,27 @@ func (c *Client) ListFiles(remotePath string) ([]FileInfo, error) {
 	return files, nil
 }
 
+// Test checks the configured WebDAV collection without uploading or deleting
+// any file. A non-2xx response includes its bounded response body in the
+// returned error for the task execution log/UI.
+func (c *Client) Test(ctx context.Context, remotePath string) error {
+	_, err := c.ListFilesContext(ctx, remotePath)
+	if err == nil {
+		return nil
+	}
+	return err
+}
+
 // Delete 删除远程文件
 func (c *Client) Delete(remotePath string) error {
+	return c.DeleteContext(context.Background(), remotePath)
+}
+
+// DeleteContext 删除远程文件，并将调用方的取消信号传递给请求。
+func (c *Client) DeleteContext(ctx context.Context, remotePath string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	fullURL, err := c.requestURL(remotePath)
 	if err != nil {
 		return err
@@ -285,6 +346,7 @@ func (c *Client) Delete(remotePath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
+	req = req.WithContext(ctx)
 
 	req.SetBasicAuth(c.username, c.password)
 

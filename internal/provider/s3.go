@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -33,8 +34,13 @@ func (p *S3Provider) Type() string {
 // Backup 执行 S3 备份，返回最终存储路径
 func (p *S3Provider) Backup(ctx BackupContext) (string, error) {
 	dest := ctx.Destination
-	if err := validateS3Destination(dest); err != nil {
+	fail := func(err error) (string, error) {
+		ctx.AddLog("s3", "OSS 上传失败: "+err.Error())
 		return "", err
+	}
+	ctx.AddLog("s3", fmt.Sprintf("开始 OSS 上传: %s", dest.S3Bucket))
+	if err := validateS3Destination(dest); err != nil {
+		return fail(err)
 	}
 	parentCtx := ctx.Context
 	if parentCtx == nil {
@@ -53,7 +59,7 @@ func (p *S3Provider) Backup(ctx BackupContext) (string, error) {
 		config.WithRegion(dest.S3Region),
 	)
 	if err != nil {
-		return "", fmt.Errorf("failed to load S3 config: %w", err)
+		return fail(fmt.Errorf("failed to load S3 config: %w", err))
 	}
 
 	// 创建 S3 客户端
@@ -67,7 +73,7 @@ func (p *S3Provider) Backup(ctx BackupContext) (string, error) {
 	// 打开源文件
 	file, err := os.Open(ctx.SourceFile)
 	if err != nil {
-		return "", fmt.Errorf("failed to open source file: %w", err)
+		return fail(fmt.Errorf("failed to open source file: %w", err))
 	}
 	defer file.Close()
 
@@ -76,7 +82,7 @@ func (p *S3Provider) Backup(ctx BackupContext) (string, error) {
 	if remotePath != "" {
 		remotePath = remotePath + "/"
 	}
-	key := fmt.Sprintf("%sbackup_%s_%s.json", remotePath, safety.Filename(ctx.TaskName), safety.Filename(ctx.Timestamp))
+	key := remotePath + renderBackupFilename(ctx)
 
 	// 上传文件
 	_, err = client.PutObject(requestCtx, &s3.PutObjectInput{
@@ -85,19 +91,21 @@ func (p *S3Provider) Backup(ctx BackupContext) (string, error) {
 		Body:   file,
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to upload to S3: %w", err)
+		return fail(fmt.Errorf("failed to upload to S3: %w", err))
 	}
 
+	ctx.AddLog("s3", fmt.Sprintf("OSS 上传完成: %s", key))
 	// 返回 S3 路径
 	return fmt.Sprintf("s3://%s/%s", dest.S3Bucket, key), nil
 }
 
 // Cleanup 清理超出保留数量的旧备份
-func (p *S3Provider) Cleanup(dest model.BackupDestination, maxCount int) (int, error) {
+func (p *S3Provider) Cleanup(ctx BackupContext, maxCount int) (int, error) {
 	if maxCount <= 0 {
 		return 0, nil
 	}
 
+	dest := ctx.Destination
 	client, err := p.createClient(dest)
 	if err != nil {
 		return 0, err
@@ -108,25 +116,40 @@ func (p *S3Provider) Cleanup(dest model.BackupDestination, maxCount int) (int, e
 	if prefix != "" {
 		prefix = prefix + "/"
 	}
-	prefix = prefix + "backup_"
+	// List the directory prefix so both the new bitwarden_* names and legacy
+	// backup_* files can participate in retention cleanup.
 
 	// 列举对象
-	requestCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	parentCtx := ctx.Context
+	if parentCtx == nil {
+		parentCtx = context.Background()
+	}
+	requestCtx, cancel := context.WithTimeout(parentCtx, 2*time.Minute)
 	defer cancel()
-	result, err := client.ListObjectsV2(requestCtx, &s3.ListObjectsV2Input{
+	listInput := &s3.ListObjectsV2Input{
 		Bucket: aws.String(dest.S3Bucket),
 		Prefix: aws.String(prefix),
-	})
-	if err != nil {
-		return 0, fmt.Errorf("failed to list objects: %w", err)
 	}
 
 	// 筛选备份文件
 	var backups []types.Object
-	for _, obj := range result.Contents {
-		key := aws.ToString(obj.Key)
-		if strings.HasSuffix(key, ".json") {
-			backups = append(backups, obj)
+	paginator := s3.NewListObjectsV2Paginator(client, listInput)
+	for paginator.HasMorePages() {
+		result, err := paginator.NextPage(requestCtx)
+		if err != nil {
+			return 0, fmt.Errorf("failed to list objects: %w", err)
+		}
+		for _, obj := range result.Contents {
+			key := aws.ToString(obj.Key)
+			relative := strings.TrimPrefix(key, prefix)
+			// ListObjectsV2 is recursive. Retention is scoped to the configured
+			// directory, so never delete matching files in nested subdirectories.
+			if strings.Contains(relative, "/") {
+				continue
+			}
+			if matchesBackupFilename(relative, ctx) {
+				backups = append(backups, obj)
+			}
 		}
 	}
 
@@ -157,15 +180,38 @@ func (p *S3Provider) Cleanup(dest model.BackupDestination, maxCount int) (int, e
 		return 0, nil
 	}
 
-	_, err = client.DeleteObjects(requestCtx, &s3.DeleteObjectsInput{
-		Bucket: aws.String(dest.S3Bucket),
-		Delete: &types.Delete{Objects: toDelete},
-	})
-	if err != nil {
-		return 0, fmt.Errorf("failed to delete objects: %w", err)
+	const maxDeleteBatch = 1000
+	deleted := 0
+	var deleteErrors []error
+	for start := 0; start < len(toDelete); start += maxDeleteBatch {
+		end := start + maxDeleteBatch
+		if end > len(toDelete) {
+			end = len(toDelete)
+		}
+		batch := toDelete[start:end]
+		result, err := client.DeleteObjects(requestCtx, &s3.DeleteObjectsInput{
+			Bucket: aws.String(dest.S3Bucket),
+			Delete: &types.Delete{Objects: batch},
+		})
+		if err != nil {
+			return deleted, fmt.Errorf("failed to delete objects: %w", err)
+		}
+		if result == nil {
+			return deleted, fmt.Errorf("failed to delete objects: empty response")
+		}
+
+		failedInBatch := 0
+		for _, item := range result.Errors {
+			failedInBatch++
+			deleteErrors = append(deleteErrors, fmt.Errorf("%s: %s (%s)", aws.ToString(item.Key), aws.ToString(item.Message), aws.ToString(item.Code)))
+		}
+		deleted += len(batch) - failedInBatch
+	}
+	if len(deleteErrors) > 0 {
+		return deleted, fmt.Errorf("failed to delete some S3 objects: %w", errors.Join(deleteErrors...))
 	}
 
-	return len(toDelete), nil
+	return deleted, nil
 }
 
 // createClient 创建 S3 客户端
