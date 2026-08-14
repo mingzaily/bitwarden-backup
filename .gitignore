@@ -43,3 +43,6 @@ web/node_modules/
 web/dist/
 *.local
 
+# AI
+.claude
+.codex
