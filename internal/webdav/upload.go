@@ -135,6 +135,13 @@ func (c *Client) requestURL(remotePath string) (string, error) {
 
 // UploadFile 上传文件到 WebDAV
 func (c *Client) UploadFile(localPath, remotePath string) error {
+	// Validate the complete remote path before creating any parent collection.
+	// This prevents an unsafe path from causing side effects during preparation.
+	fullURL, err := c.requestURL(remotePath)
+	if err != nil {
+		return err
+	}
+
 	// 读取本地文件
 	file, err := os.Open(localPath)
 	if err != nil {
@@ -151,12 +158,6 @@ func (c *Client) UploadFile(localPath, remotePath string) error {
 		if err := c.ensureDirectory(parentPath); err != nil {
 			return fmt.Errorf("failed to prepare WebDAV directory %q: %w", parentPath, err)
 		}
-	}
-
-	// 构建完整的远程路径
-	fullURL, err := c.requestURL(remotePath)
-	if err != nil {
-		return err
 	}
 
 	// 创建 PUT 请求

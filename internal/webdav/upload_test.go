@@ -146,6 +146,29 @@ func TestUploadFileIncludesWebDAVResponseBody(t *testing.T) {
 	}
 }
 
+func TestUploadFileRejectsUnsafePathBeforeDirectoryRequests(t *testing.T) {
+	var requests int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	tempDir := t.TempDir()
+	localPath := filepath.Join(tempDir, "backup.json")
+	if err := os.WriteFile(localPath, []byte("backup"), 0600); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	client := NewClient(server.URL+"/dav/", "user", "password")
+	if err := client.UploadFile(localPath, "nested/../backup.json"); err == nil {
+		t.Fatal("UploadFile accepted an unsafe remote path")
+	}
+	if requests != 0 {
+		t.Fatalf("UploadFile sent %d requests for an unsafe remote path, want 0", requests)
+	}
+}
+
 func TestResponseErrorWithoutBody(t *testing.T) {
 	resp := &http.Response{StatusCode: http.StatusConflict, Body: io.NopCloser(strings.NewReader(""))}
 	err := responseError("upload", resp)
