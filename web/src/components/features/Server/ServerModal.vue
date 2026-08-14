@@ -26,7 +26,7 @@
             <TabSelector v-if="formData.server_type === 'official'" v-model="formData.region" :options="officialRegions" label="服务器区域" />
             <div v-if="formData.server_type === 'self-hosted'" class="field">
               <label class="field-label" for="server-url">源站地址</label>
-              <input id="server-url" v-model="formData.url" class="input" type="url" required placeholder="https://vault.example.com" />
+              <input id="server-url" v-model="formData.url" class="input" type="url" required placeholder="https://example.com" />
               <p class="field-hint">填写自建 Bitwarden 服务器的完整地址。</p>
             </div>
           </section>

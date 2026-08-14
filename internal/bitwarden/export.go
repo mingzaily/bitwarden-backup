@@ -17,8 +17,8 @@ func (c *Client) Unlock(ctx context.Context, masterPassword string) error {
 		}
 	}
 
-	// 使用环境变量传递密码，避免交互式输入的偶发问题
-	// --passwordenv: 从环境变量读取密码
+	// 使用环境变量传递密码，避免交互式输入的偶发问题。
+	// --passwordenv 是 unlock 支持的参数，export 仅支持 --password。
 	// --nointeraction: 禁用交互式提示，失败时直接返回非零退出码
 	extraEnv := map[string]string{
 		"BW_PASSWORD": masterPassword,
@@ -82,6 +82,17 @@ func (e *ErrNotLoggedIn) Error() string {
 	return e.Msg
 }
 
+func buildExportArgs(outputPath, format, sessionToken string, password ...string) []string {
+	args := []string{"export", "--output", outputPath, "--format", format}
+	if sessionToken != "" {
+		args = append(args, "--session", sessionToken)
+	}
+	if len(password) > 0 && password[0] != "" {
+		args = append(args, "--password", password[0])
+	}
+	return args
+}
+
 // Export 导出密码库数据
 // password 参数为可选，仅在 format 为 "encrypted_json" 时需要提供
 func (c *Client) Export(ctx context.Context, outputPath, format string, password ...string) error {
@@ -98,22 +109,11 @@ func (c *Client) Export(ctx context.Context, outputPath, format string, password
 		return fmt.Errorf("failed to secure output directory: %w", err)
 	}
 
-	// 构建命令参数
-	args := []string{"export", "--output", outputPath, "--format", format}
-	if c.sessionToken != "" {
-		args = append(args, "--session", c.sessionToken)
-	}
+	// export 只接受 --password，不支持 unlock 使用的 --passwordenv。
+	// redactBWArgs 会避免密码出现在运行日志中。
+	args := buildExportArgs(outputPath, format, c.sessionToken, password...)
 
-	// 使用环境变量传递导出密码，避免密码出现在命令行参数和进程列表中。
-	if len(password) > 0 && password[0] != "" {
-		args = append(args, "--passwordenv", "BW_EXPORT_PASSWORD")
-	}
-
-	extraEnv := make(map[string]string)
-	if len(password) > 0 && password[0] != "" {
-		extraEnv["BW_EXPORT_PASSWORD"] = password[0]
-	}
-	res, err := c.runBW(ctx, args, "", extraEnv)
+	res, err := c.runBW(ctx, args, "", nil)
 	if err != nil {
 		if strings.TrimSpace(res.Stdout) != "" {
 			c.AddLog(fmt.Sprintf("bw export stdout: %s", strings.TrimSpace(res.Stdout)))
