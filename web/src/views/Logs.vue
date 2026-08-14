@@ -6,10 +6,28 @@
         <h2 class="page-title">运行记录</h2>
         <p class="page-subtitle">查看备份任务的状态、产物和执行过程</p>
       </div>
-      <div class="flex flex-wrap items-center gap-2">
+      <div class="flex flex-wrap items-center justify-end gap-2">
         <button class="btn-secondary" type="button" :disabled="loading" title="刷新运行记录" @click="refreshLogs">
           <svg class="h-4 w-4" :class="loading ? 'animate-spin' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 4v5h5M20 20v-5h-5M6.7 9A7 7 0 0 1 19 6.5L20 9M4 15l1 2.5A7 7 0 0 0 17.3 15" /></svg>
           {{ loading ? '刷新中…' : '刷新' }}
+        </button>
+        <div v-if="selectionMode" class="log-selection-controls">
+          <span class="log-selection-count" aria-live="polite">已选 {{ selectedLogIds.size }} 条</span>
+          <button class="btn-ghost log-selection-all" type="button" :disabled="selectableLogs.length === 0 || deleting" @click="togglePageSelection">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 5.5h1.5M5 12h1.5M5 18.5h1.5M10 5.5h9M10 12h9M10 18.5h9" /></svg>
+            {{ isPageSelected ? '取消全选' : '全选当前页' }}
+          </button>
+          <span v-if="selectableLogs.length < logs.length" class="log-selection-note">运行中不可选</span>
+          <button class="btn-ghost" type="button" :disabled="deleting" title="清空选择并退出多选模式" @click="exitSelectionMode">清空</button>
+          <button class="btn-danger" type="button" :disabled="selectedLogIds.size === 0 || deleting" @click="deleteSelectedLogs">
+            <svg v-if="!deleting" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 7h14m-9 4v5m4-5v5M9 7V5h6v2m-8 0 1 13h8l1-13" /></svg>
+            <span v-else class="spinner"></span>
+            {{ deleting ? '删除中…' : '删除选中' }}
+          </button>
+        </div>
+        <button v-else class="btn-secondary" type="button" :disabled="loading || logs.length === 0" title="进入多选模式" @click="enterSelectionMode">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 5.5h1.5M5 12h1.5M5 18.5h1.5M10 5.5h9M10 12h9M10 18.5h9" /></svg>
+          选择
         </button>
         <CustomSelect v-model="selectedTaskId" :options="taskOptions" placeholder="全部任务" class="w-52" @update:modelValue="handleTaskChange" />
       </div>
@@ -18,72 +36,48 @@
     <div v-if="loading" class="loading-state"><div><div class="spinner mx-auto text-accent"></div><p class="mt-3 text-sm">正在读取日志…</p></div></div>
     <div v-else-if="logs.length === 0" class="empty-state"><div><div class="empty-state-icon"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M5 5h14v14H5zM8 9h8M8 13h5" /></svg></div><p class="text-sm font-semibold text-main">暂无运行记录</p><p class="mt-1 text-xs text-muted">任务执行后，状态和备份产物会出现在这里。</p></div></div>
     <div v-else class="space-y-3">
-      <div class="log-selection-toolbar">
-        <label class="log-select-all">
-          <input
-            ref="selectAllCheckbox"
-            class="log-checkbox"
-            type="checkbox"
-            :checked="isPageSelected"
-            :aria-checked="isPagePartiallySelected ? 'mixed' : String(isPageSelected)"
-            :disabled="selectableLogs.length === 0 || deleting"
-            aria-label="选择当前页可删除的运行记录"
-            @change="togglePageSelection"
-          />
-          <span>全选当前页</span>
-          <span v-if="selectedLogIds.size" class="log-selection-count">已选 {{ selectedLogIds.size }} 条</span>
-        </label>
-        <div class="flex flex-wrap items-center gap-2">
-          <span v-if="selectableLogs.length < logs.length" class="text-xs text-subtle">运行中的记录不能删除</span>
-          <button class="btn-danger" type="button" :disabled="selectedLogIds.size === 0 || deleting" @click="deleteSelectedLogs">
-            <svg v-if="!deleting" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 7h14m-9 4v5m4-5v5M9 7V5h6v2m-8 0 1 13h8l1-13" /></svg>
-            <span v-else class="spinner"></span>
-            {{ deleting ? '删除中…' : '删除选中' }}
-          </button>
-          <button v-if="selectedLogIds.size" class="btn-ghost" type="button" :disabled="deleting" @click="clearSelection">取消选择</button>
-        </div>
-      </div>
       <div class="grid gap-3">
-        <article v-for="log in logs" :key="log.id" :class="['resource-card', 'log-resource-card', selectedLogIds.has(log.id) ? 'is-selected' : '']">
-        <div class="log-status-column">
-          <label class="log-select-control" :title="log.status === 'running' ? '运行中的记录不能删除' : '选择运行记录'">
-            <input
-              class="log-checkbox"
-              type="checkbox"
-              :checked="selectedLogIds.has(log.id)"
-              :disabled="log.status === 'running' || deleting"
-              :aria-label="`选择 ${log.task_name} 的运行记录`"
-              @change="toggleLogSelection(log.id)"
-            />
-          </label>
-          <div :class="['resource-leading', log.status === 'failed' ? 'is-danger' : log.status === 'running' ? 'is-info' : '']" aria-hidden="true">
-          <svg v-if="log.status === 'success'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="m5 12.5 4 4L19 7" /></svg>
-          <svg v-else-if="log.status === 'failed'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M6 18 18 6M6 6l12 12" /></svg>
-          <svg v-else fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 7v5l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+        <article v-for="log in logs" :key="log.id" :class="['resource-card', 'log-resource-card', selectionMode ? 'is-selection-mode' : '', selectedLogIds.has(log.id) ? 'is-selected' : '']">
+          <div v-if="selectionMode" class="log-selection-cell">
+            <label class="log-select-control" :title="log.status === 'running' ? '运行中的记录不能删除' : '选择运行记录'">
+              <input
+                class="log-checkbox"
+                type="checkbox"
+                :checked="selectedLogIds.has(log.id)"
+                :disabled="log.status === 'running' || deleting"
+                :aria-label="`选择 ${log.task_name} 的运行记录`"
+                @change="toggleLogSelection(log.id)"
+              />
+            </label>
           </div>
-          <span :class="getStatusClass(log.status)">{{ getStatusLabel(log.status) }}</span>
-        </div>
-        <div class="resource-content log-card-content">
-          <div class="log-card-main">
-            <h3 class="log-card-title" :title="log.task_name">{{ log.task_name }}</h3>
-            <p v-if="log.message" :class="['log-summary', isErrorSummary(log) ? 'is-danger' : '']">{{ formatMessage(log.message) }}</p>
-            <template v-if="log.status === 'failed' && log.message">
-              <button class="log-error-toggle" type="button" @click="toggleDetail(log.id)"><svg :class="['h-3 w-3 transition-transform', expandedLogs.has(log.id) ? 'rotate-90' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="m9 5 7 7-7 7" /></svg>{{ expandedLogs.has(log.id) ? '收起错误' : '查看完整错误' }}</button>
-              <div v-if="expandedLogs.has(log.id)" class="log-error-detail"><code>{{ log.message }}</code></div>
-            </template>
-          </div>
-          <div class="log-card-meta">
-            <div class="log-card-meta-item">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-              <time class="log-card-meta-value" :datetime="log.created_at">{{ formatTime(log.created_at) }}</time>
-            </div>
-            <div v-if="log.backup_file" class="log-card-meta-item" :title="log.backup_file">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.6a1 1 0 0 1 .7.3l5.4 5.4a1 1 0 0 1 .3.7V19a2 2 0 0 1-2 2Z" /></svg>
-              <span class="log-card-meta-value mono">{{ formatBackupFileName(log.backup_file) }}</span>
+          <div class="log-status-column">
+            <div :class="['resource-leading', log.status === 'failed' ? 'is-danger' : log.status === 'running' ? 'is-info' : '']" :aria-label="getStatusLabel(log.status)" role="img">
+              <svg v-if="log.status === 'success'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="m5 12.5 4 4L19 7" /></svg>
+              <svg v-else-if="log.status === 'failed'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M6 18 18 6M6 6l12 12" /></svg>
+              <svg v-else fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 7v5l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1-18 0Z" /></svg>
             </div>
           </div>
-        </div>
-        <div class="resource-actions log-card-actions"><button class="btn-secondary" type="button" @click="showLogDetail(log)">查看详情</button></div>
+          <div class="resource-content log-card-content">
+            <div class="log-card-main">
+              <h3 class="log-card-title" :title="log.task_name">{{ log.task_name }}</h3>
+              <p v-if="log.message" :class="['log-summary', isErrorSummary(log) ? 'is-danger' : '']">{{ formatMessage(log.message) }}</p>
+              <template v-if="log.status === 'failed' && log.message">
+                <button class="log-error-toggle" type="button" @click="toggleDetail(log.id)"><svg :class="['h-3 w-3 transition-transform', expandedLogs.has(log.id) ? 'rotate-90' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="m9 5 7 7-7 7" /></svg>{{ expandedLogs.has(log.id) ? '收起错误' : '查看完整错误' }}</button>
+                <div v-if="expandedLogs.has(log.id)" class="log-error-detail"><code>{{ log.message }}</code></div>
+              </template>
+            </div>
+            <div class="log-card-meta">
+              <div class="log-card-meta-item">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 3.75a8.25 8.25 0 1 0 0 16.5 8.25 8.25 0 0 0 0-16.5ZM12 7v5l3 2" /></svg>
+                <time class="log-card-meta-value" :datetime="log.created_at">{{ formatTime(log.created_at) }}</time>
+              </div>
+              <div v-if="log.backup_file" class="log-card-meta-item" :title="log.backup_file">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.6a1 1 0 0 1 .7.3l5.4 5.4a1 1 0 0 1 .3.7V19a2 2 0 0 1-2 2Z" /></svg>
+                <span class="log-card-meta-value mono">{{ formatBackupFileName(log.backup_file) }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="resource-actions log-card-actions"><button class="btn-secondary" type="button" @click="showLogDetail(log)">查看详情</button></div>
         </article>
         <Pagination :page="pagination.page" :page-size="pagination.pageSize" :total="pagination.total" :total-page="pagination.totalPage" @change="handlePageChange" />
       </div>
@@ -94,7 +88,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { logsApi, tasksApi } from '@/api'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
@@ -111,8 +105,8 @@ const selectedTaskId = ref('')
 const expandedLogs = ref(new Set())
 const selectedLog = ref(null)
 const selectedLogIds = ref(new Set())
+const selectionMode = ref(false)
 const deleting = ref(false)
-const selectAllCheckbox = ref(null)
 const pagination = ref({ page: 1, pageSize: 10, total: 0, totalPage: 0 })
 
 const toggleDetail = (logId) => {
@@ -124,12 +118,7 @@ const showLogDetail = (log) => { selectedLog.value = log }
 const taskOptions = computed(() => [{ label: '全部任务', value: '' }, ...tasks.value.map(task => ({ label: task.name, value: task.id }))])
 const selectableLogs = computed(() => logs.value.filter(log => log.status !== 'running'))
 const isPageSelected = computed(() => selectableLogs.value.length > 0 && selectableLogs.value.every(log => selectedLogIds.value.has(log.id)))
-const isPagePartiallySelected = computed(() => {
-  const selectedCount = selectableLogs.value.filter(log => selectedLogIds.value.has(log.id)).length
-  return selectedCount > 0 && !isPageSelected.value
-})
 const getStatusLabel = (status) => ({ success: '成功', failed: '失败', running: '运行中' }[status] || status)
-const getStatusClass = (status) => ({ success: 'status-badge status-success', failed: 'status-badge status-danger', running: 'status-badge status-info' }[status] || 'status-badge status-neutral')
 const formatTime = (time) => {
   if (!time) return 'N/A'
   const date = new Date(time)
@@ -173,6 +162,14 @@ const formatMessage = (message) => {
 }
 
 const clearSelection = () => { selectedLogIds.value = new Set() }
+const enterSelectionMode = () => {
+  clearSelection()
+  selectionMode.value = true
+}
+const exitSelectionMode = () => {
+  clearSelection()
+  selectionMode.value = false
+}
 const toggleLogSelection = (logId) => {
   const next = new Set(selectedLogIds.value)
   if (next.has(logId)) next.delete(logId)
@@ -201,6 +198,7 @@ const deleteSelectedLogs = async () => {
     const res = await logsApi.deleteMany([...selectedLogIds.value])
     const deletedCount = Number(res?.deleted || 0)
     clearSelection()
+    selectionMode.value = false
     if (deletedCount > 0) toast.success(`已删除 ${deletedCount} 条运行记录`)
     else toast.success('选中的运行记录已不存在或正在运行')
     await loadLogs()
@@ -233,15 +231,12 @@ const loadLogs = async () => {
     toast.error('加载日志失败')
   } finally { loading.value = false }
 }
-const handleTaskChange = () => { clearSelection(); pagination.value.page = 1; loadLogs() }
-const handlePageChange = (page) => { clearSelection(); pagination.value.page = page; loadLogs() }
-const refreshLogs = () => { clearSelection(); loadLogs() }
+const handleTaskChange = () => { exitSelectionMode(); pagination.value.page = 1; loadLogs() }
+const handlePageChange = (page) => { exitSelectionMode(); pagination.value.page = page; loadLogs() }
+const refreshLogs = () => { loadLogs() }
 const loadTasks = async () => {
   try { const res = await tasksApi.getAll(); tasks.value = res.data || [] }
   catch (error) { console.error('Failed to load tasks:', error) }
 }
 onMounted(() => { loadTasks(); loadLogs() })
-watch([isPageSelected, isPagePartiallySelected], () => {
-  if (selectAllCheckbox.value) selectAllCheckbox.value.indeterminate = isPagePartiallySelected.value
-}, { immediate: true })
 </script>
