@@ -89,7 +89,7 @@
       </nav>
       <div class="mt-auto space-y-2">
         <div class="rounded-2xl border border-line bg-panel-soft/70 p-4"><p class="eyebrow">SYSTEM STATUS</p><div class="mt-3 flex items-center gap-2 text-sm text-muted"><span class="status-pulse"></span>运行正常</div><p class="mt-2 text-xs leading-5 text-subtle">凭证已加密 · API 会话安全</p></div>
-        <div class="rounded-2xl border border-line bg-panel-soft/70 p-4"><p class="eyebrow">VERSION</p><div class="mt-3"><span class="brand-version mt-0">{{ appVersion }}</span></div><p class="mt-2 text-xs leading-5 text-subtle">当前运行版本</p></div>
+        <div class="rounded-2xl border border-line bg-panel-soft/70 p-4"><p class="eyebrow">VERSION</p><div class="mt-3"><span class="brand-version version-card-badge mt-0">{{ appVersion }}</span></div><p class="mt-2 text-xs leading-5 text-subtle">当前运行版本</p></div>
       </div>
     </aside>
 

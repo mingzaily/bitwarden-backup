@@ -6,7 +6,10 @@
 [![Docker Image](https://ghcr-badge.egpl.dev/mingzaily/bitwarden-backup/latest_tag?trim=major&label=Docker%20Image)](https://github.com/mingzaily/bitwarden-backup/pkgs/container/bitwarden-backup)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-![Bitwarden Backup 控制台](main.png)
+<p align="center">
+  <img src="screenshots/login-light.jpg" alt="Bitwarden Backup 登录页" width="49%" />
+  <img src="screenshots/overview-light.jpg" alt="Bitwarden Backup 总览页" width="49%" />
+</p>
 
 ## 功能
 
@@ -17,19 +20,19 @@
 - 支持备份文件加密、保留策略和临时文件清理
 - 提供 amd64/arm64 Docker 镜像
 
-## 和常规 Docker + rclone 方案有什么不同
+## 和常见的 Vaultwarden 数据目录备份有什么不同
 
-常见的做法是用 Docker 跑 Bitwarden CLI，再用 Shell、Cron 和 rclone 把导出的文件搬到远端。rclone 很擅长连接各种存储，但登录、同步、解锁、导出、加密、保留和失败排查，通常都要自己写脚本串起来。
+Docker 只是 Vaultwarden 的部署方式。常见做法是把容器内的 `/data` 挂载到宿主机，再定期备份整个数据目录；需要异地保存时，再用 rclone、rsync 或其他备份工具同步到远端。这属于实例级的文件备份，恢复时可以还原整个 Vaultwarden 运行环境。
 
-Bitwarden Backup 是面向 Bitwarden 的备份控制面，不依赖额外的 rclone 容器或脚本来编排这些步骤：
+Bitwarden Backup 走的是另一条路径：连接 Bitwarden / Vaultwarden 源站，通过 Bitwarden CLI 执行同步、解锁和加密导出，生成可独立保存的逻辑备份文件：
 
-- 直接管理 Bitwarden 源站、存储目标和备份任务，一次任务可写入多个目标。
-- 统一处理 CLI 登录、同步、解锁和加密导出，不需要手工维护一套 Shell 流程。
-- 在页面中配置定时计划、文件名模板、保留策略和加密选项，编辑后即可复用。
-- 按任务和存储目标记录执行状态、服务商日志、HTTP 响应和错误详情，问题定位不再依赖翻容器日志。
-- 支持备份到另一个 Bitwarden 服务器，适合异地保存和实例迁移。
+- 不需要进入 Vaultwarden 容器，也不依赖宿主机上的 `/data` 目录。
+- 直接管理多个源站、存储目标和备份任务，一次任务可写入多个目标。
+- 在页面中配置定时计划、文件名模板、保留策略和加密选项，不需要自己维护 Shell 和 Cron 编排。
+- 按任务和存储目标记录执行状态、服务商日志、HTTP 响应和错误详情，排查问题更直观。
+- 支持导出到另一个 Bitwarden / Vaultwarden 服务器，适合异地保存和实例迁移。
 
-它的重点不是替代 rclone 的存储后端广度，而是把 Bitwarden 备份本身的生命周期管理起来。如果你已经有成熟的 rclone 脚本体系，继续使用 rclone 也很合适；如果希望少维护脚本和定时任务，这个项目提供的是更完整的 Bitwarden 备份工作流。
+两种方式并不冲突：数据目录备份适合完整恢复 Vaultwarden 实例；本项目适合做与部署解耦的逻辑备份、异地副本和跨实例迁移。如果你的目标是恢复整个实例，仍建议保留 `/data` 目录级备份。
 
 ## 快速开始
 
