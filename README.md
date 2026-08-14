@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub Stars](https://img.shields.io/github/stars/mingzaily/bitwarden-backup?style=social)](https://github.com/mingzaily/bitwarden-backup)
 
-![主界面截图](main.png)
+![新版控制台总览截图](main.png)
 
 ## 为什么选择这个工具？
 
