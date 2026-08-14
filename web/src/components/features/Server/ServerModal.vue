@@ -50,10 +50,7 @@
                 <p v-if="server" class="field-hint">留空表示不修改当前凭证。</p>
               </div>
               <div class="field">
-                <div class="field-label-row">
-                  <label class="field-label" for="master-password">Master Password</label>
-                  <span class="field-label-note">用于解锁保险库</span>
-                </div>
+                <label class="field-label" for="master-password">Master Password</label>
                 <input id="master-password" v-model="formData.master_password" class="input" type="password" :required="!server" autocomplete="new-password" :placeholder="server ? '留空保持原值' : '输入 Master Password'" />
                 <p class="field-hint">{{ server ? '留空表示不修改当前密码；填写后将替换。' : '备份时通过 Bitwarden CLI 解锁 Bitwarden 保险库。' }}</p>
               </div>
