@@ -20,7 +20,7 @@
         </div>
         <div class="resource-content">
           <div class="resource-title-row"><span :class="getStatusClass(log.status)">{{ getStatusLabel(log.status) }}</span><span class="resource-title">{{ log.task_name }}</span></div>
-          <p v-if="log.message" class="mt-2 text-sm leading-6 text-muted">{{ formatMessage(log.message) }}</p>
+          <p v-if="log.message && !isRedundantFailureSummary(log.message)" class="mt-2 text-sm leading-6 text-muted">{{ formatMessage(log.message) }}</p>
           <div v-if="log.status === 'success' && log.backup_file" class="resource-meta"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.6a1 1 0 0 1 .7.3l5.4 5.4a1 1 0 0 1 .3.7V19a2 2 0 0 1-2 2Z" /></svg><span class="mono">{{ log.backup_file }}</span></div>
           <div class="resource-meta"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg><span>{{ formatTime(log.created_at) }}</span></div>
           <template v-if="log.status === 'failed' && formatMessage(log.message) !== log.message">
@@ -64,6 +64,7 @@ const taskOptions = computed(() => [{ label: '全部任务', value: '' }, ...tas
 const getStatusLabel = (status) => ({ success: '成功', failed: '失败', running: '运行中' }[status] || status)
 const getStatusClass = (status) => ({ success: 'status-badge status-success', failed: 'status-badge status-danger', running: 'status-badge status-info' }[status] || 'status-badge status-neutral')
 const formatTime = (time) => time ? new Date(time).toLocaleString('zh-CN') : 'N/A'
+const isRedundantFailureSummary = (message) => /export failed/i.test(String(message))
 const formatMessage = (message) => {
   if (!message) return ''
   if (message === 'Backup completed successfully') return '备份成功'
